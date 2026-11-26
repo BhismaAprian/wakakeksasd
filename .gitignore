@@ -1,22 +1,22 @@
 # Local agent skills & cache
 .agents/
 
-# Python artifacts
+# Heavy checkpoints & local resume archive (>45 MB excluded from GitHub)
+artifacts_weights_local/
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.tar.gz
+*.zip
+
+# Raw dataset & logs
+*.log
+*.jsonl
 __pycache__/
 *.py[cod]
 *$py.class
+.ipynb_checkpoints/
 .venv/
-
-# Large model checkpoints, embeddings, datasets, and credentials
-*.pth
-*.pt
-*.npy
-*.npz
-*.parquet
-*.zip
-*.jpg
-*.jpeg
-*.png
 .env
 *.token
-*.jsonl

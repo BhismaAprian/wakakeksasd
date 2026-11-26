@@ -527,7 +527,7 @@ def K5_change(
 @app.cell(hide_code=True)
 def M6_change_dist(mo):
     mo.md("""
-    ## 6. Analisis Perubahan per Kelas (Jika Label Ada)
+    ## 6. Analisis Perubahan per Kelas
 
     - **Tujuan tahap:** Mengevaluasi apakah metrik perubahan (`SSIM` dan `MAE`) berbeda signifikan antar kelas fenomena (jika `HAS_LABELS=True`), atau menganalisis distribusi `SSIM` keseluruhan beserta KDE, kuartil, dan uji bimodalitas (jika `HAS_LABELS=False`) untuk mendeteksi adanya dua rezim perubahan (ringan vs masif).
     - **Output yang diharapkan:** Boxplot per kelas (bila berlabel) atau histogram `SSIM` + kurva KDE, nilai kuartil, jumlah puncak KDE, dan koefisien bimodalitas Sarle.
@@ -1985,7 +1985,7 @@ def K16_model(pd, timm, torch):
     del _m_eff, _m_cnx, _d_pre, _d_post
     print(_model_test_df.to_string(index=False))
     _model_test_df
-    return SiameseDualFusion, nn
+    return
 
 
 @app.cell(hide_code=True)
@@ -2104,270 +2104,919 @@ def K17_dataset(
         _p1, _p2, _y, _sid = _ds_test[_j]
         assert _p1.shape == (3, 384, 384) and _p2.shape == (3, 384, 384)
     print("Uji FenomenaDataset (4 sampel) BERHASIL: shape=(3, 384, 384).")
-    return (
-        IMAGENET_MEAN,
-        IMAGENET_STD,
-        IMG_CACHE_384,
-        LABEL2IDX,
-        df_train_folds,
-    )
+    return
 
 
 @app.cell(hide_code=True)
-def M18_train(mo):
+def M18_env_audit(mo):
     mo.md("""
-    ## 18. Training Siamese Network (Dual Architecture)
+    ## 18. Audit Lingkungan Fase Lanjutan & Baseline Checkpoints
 
-    - **Tujuan tahap:** Melatih dua arsitektur Siamese berbeda (`SiameseDualFusion` berbasis `efficientnet_b4` dan `SiameseConvNeXt` berbasis `convnext_small.fb_in22k_ft_in1k`) dengan Stratified 5-Fold CV pada `df_train_folds`, menggunakan *class weights* (`1/freq`, ternormalisasi) sesuai temuan `(T2)`, `label_smoothing=0.1`, *cosine schedule* + *warmup* 5 epoch, AMP `bfloat16`, dan *early stopping* (`patience=7`).
-    - **Output yang diharapkan:** Checkpoint terbaik tiap fold (`/marimo/Fenomena/ckpt_{model}_fold{k}.pth`), probabilitas OOF (`/marimo/Fenomena/oof_{model}.npy`), ringkasan **OOF Macro F1** per fold dan per kelas, serta log di `/marimo/Fenomena/training_log.md`.
+    - **Tujuan tahap:** Memverifikasi kesiapan GPU (`NVIDIA RTX PRO 6000 Blackwell`, VRAM ~102 GB), paket tambahan (`albumentations`, `lightgbm`, `catboost`, `xgboost`), serta memeriksa distribusi bias awal `pseudo_labels.parquet` v1 (`Fire` `61.57%`) sebelum menjalankan Fase 1 (*Multi-Teacher De-Biased Pseudo-Labeling*).
+    - **Output yang diharapkan:** Tabel versi library, kapasitas GPU bebas, dan distribusi kelas baseline v1.
     """)
     return
 
 
 @app.cell
-def K18a_train_effb4(
-    ARTIFACT_DIR,
-    CLASS_NAMES,
-    IMAGENET_MEAN,
-    IMAGENET_STD,
-    IMG_CACHE_384,
-    LABEL2IDX,
-    Path,
-    SiameseDualFusion,
-    df_inv_clean,
-    df_train_folds,
-    mo,
-    nn,
-    np,
-    pd,
-    torch,
-):
-    # Definisi fungsi training 5-fold terpadu berkecepatan tinggi (GPU-cached tensor + augmentasi
-    # geometrik identik & ColorJitter independen di GPU, AMP BF16, class weights, cosine warmup) dan training EffNet-B4.
+def K18_env_audit():
+    # Audit lingkungan Fase 0: verifikasi versi library CV/GBDT, kapasitas GPU VRAM,
+    # dan baseline distribusi pseudo_labels.parquet v1 (Qwen2.5-VL-7B).
+    import importlib as _imp
+    import subprocess as _subp
+    import pandas as _pd
+    from pathlib import Path as _Path
+
+    _ART = _Path("/marimo/Fenomena")
+    _pkg_rows = []
+    for _p in ["torch", "timm", "open_clip", "transformers", "albumentations", "skimage", "lightgbm", "catboost", "xgboost", "sklearn"]:
+        try:
+            _m = _imp.import_module(_p)
+            _pkg_rows.append({"package": _p, "version": getattr(_m, "__version__", "ok")})
+        except Exception as _e:
+            _pkg_rows.append({"package": _p, "version": f"MISSING: {_e}"})
+
+    _gpu_info = _subp.check_output(
+        ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader"]
+    ).decode().strip()
+    print("GPU:", _gpu_info)
+    print(_pd.DataFrame(_pkg_rows).to_string(index=False))
+
+    _v1_df = _pd.read_parquet(_ART / "pseudo_labels.parquet")
+    print("\nDistribusi pseudo_labels.parquet v1 (Qwen2.5-VL-7B — RED FLAG bias Fire):")
+    print((_v1_df["vlm_label"].value_counts(normalize=True) * 100).round(2).to_string())
+    _pd.DataFrame(_pkg_rows)
+    return
+
+
+@app.cell(hide_code=True)
+def M19_pseudo_v2(mo):
+    mo.md("""
+    ## 19. Fase 1: Multi-Teacher De-Biased & Temporal-Swap Invariant Pseudo-Labeling
+
+    - **Dasar Audit Forensik (Cell 20):** Sebanyak `33–45%` pasangan memiliki indikasi arah visual terbalik (`pre` lebih rusak/gelap dibanding `post`), sehingga seluruh teacher dan fitur wajib **invarian terhadap penukaran urutan `pre ↔ post`**.
+    - **Desain Multi-Teacher:**
+      1. **Symmetric Satellite Foundation Teacher (`RemoteCLIP` + `SkyCLIP`):** Membentuk representasi invarian-urutan $\mathbf{f}_{	ext{sym}} = [    rac{1}{2}(\mathbf{e}_{	ext{pre}} + \mathbf{e}_{	ext{post}}), |\mathbf{e}_{	ext{post}} - \mathbf{e}_{	ext{pre}}|]$ (plus rata-rata `hflip` untuk `RemoteCLIP`), menghitung skor semantik simetris `0.5 * max(s_pre, s_post) + 0.5 * |s_post - s_pre|` terhadap 5 prompt per kelas, lalu menerapkan **z-score centering per kolom kelas** (`clip_teacher_sym_probs.npy`).
+      2. **High-Res VLM Teacher (`Qwen/Qwen2.5-VL-32B-Instruct`, `448x448` per tile + 2x HFlip TTA):** Mengaudit distribusi hasil Batch `199/199`, dan jika proporsi `Fire > 35%` atau terdapat bias arah pada 556 sampel `is_sem_both_neg`, menjalankan *targeted symmetric re-pass* `[post | pre]` + prompt simetris eksplisit.
+      3. **Fusi Konsensus & Kunci Fold:** Menggabungkan probabilitas VLM-32B dan CLIP simetris menjadi `pseudo_labels_v2.parquet` serta `consensus_soft_v1.npy`, lalu mengunci `folds_skf5.npy`.
+    """)
+    return
+
+
+@app.cell
+def K19a_clip_teacher():
+    # Bagian 19A: Symmetric Satellite Foundation Teacher (RemoteCLIP + SkyCLIP)
+    # Membangun fitur simetris invarian-urutan f_sym dan skor kosinus z-score centered (CPU-safe).
+    import numpy as _np
+    import pandas as _pd
+    import matplotlib as _mpl
+    _mpl.use("Agg")
+    import matplotlib.pyplot as _plt
+    from pathlib import Path as _Path
+    import torch as _torch
+    import torch.nn.functional as _F
+    import open_clip as _open_clip
+    from huggingface_hub import hf_hub_download as _hf_dl
+
+    _ART = _Path("/marimo/Fenomena")
+    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    _PROMPTS = {
+        "Earthquake": [
+            "aerial satellite view of collapsed buildings and gray concrete rubble after an earthquake",
+            "urban residential blocks shattered and crumbled into debris piles from earthquake shaking",
+            "earthquake structural devastation with fractured roads and demolished multi-story buildings without burn scars",
+            "post-earthquake aerial imagery showing widespread roof collapses and gray dust over city streets",
+            "satellite change detection showing intact neighborhoods turned into earthquake rubble fields",
+        ],
+        "Fire": [
+            "aerial satellite image of charred black vegetation burn scar from wildfire",
+            "active forest fire and brushfire smoke plumes over scorched dark brown terrain",
+            "post-wildfire satellite view with blackened burnt trees while paved roads remain intact",
+            "burnt farmland and forest canopy turned black and dark ash by wildfire",
+            "aerial change detection of green vegetation transformed into scorched wildfire burn scar",
+        ],
+        "Hurricane": [
+            "aerial satellite image of hurricane wind damage with stripped roofs and scattered debris",
+            "widespread tropical cyclone damage showing uprooted trees and flooded inland neighborhoods",
+            "post-hurricane aerial view with torn blue tarps on damaged roofs and storm surge puddles",
+            "wind-damaged suburban houses and fallen forest timber caused by severe hurricane",
+            "satellite change detection showing hurricane wind destruction and inland rainwater flooding",
+        ],
+        "Tsunami": [
+            "aerial satellite image of tsunami coastal flooding with shoreline buildings swept completely bare",
+            "eroded receding coastline and muddy seawater inundation extending inland after a tsunami",
+            "coastal settlement washed away to bare mud and debris lines by tsunami ocean waves",
+            "post-tsunami satellite view showing flooded harbor, washed-out coastal roads, and stranded boats",
+            "aerial change detection of coastal town obliterated by tsunami wave surge",
+        ],
+        "Volcano": [
+            "aerial satellite image of thick gray or white volcanic ash blanket covering land and roofs",
+            "volcanic eruption aftermath with dark basaltic lava flows and pyroclastic deposits burying terrain",
+            "satellite view of volcanic crater rim, ash fallout plumes, and ash-covered vegetation",
+            "post-volcano aerial imagery showing smooth gray tephra deposits and hardened lava channels",
+            "aerial change detection of green valley buried under volcanic ash and lava flow",
+        ],
+        "Explosion": [
+            "aerial satellite image of a localized circular explosion crater and radial blast damage",
+            "industrial or port blast epicenter showing circular shockwave destruction radiating outward",
+            "concentrated explosion site with scorched blast crater and shattered nearby warehouses",
+            "post-explosion aerial view showing single-point blast crater surrounded by radially blown roofs",
+            "aerial change detection of intact industrial facility replaced by a localized blast crater",
+        ],
+    }
+
+    def _encode_prompts_cpu(_repo, _fn):
+        _ckpt = _hf_dl(repo_id=_repo, filename=_fn)
+        _m, _, _ = _open_clip.create_model_and_transforms("ViT-L-14")
+        _raw = _torch.load(_ckpt, map_location="cpu", weights_only=False)
+        if isinstance(_raw, dict) and "state_dict" in _raw:
+            _raw = _raw["state_dict"]
+        elif isinstance(_raw, dict) and "model" in _raw:
+            _raw = _raw["model"]
+        _raw = {_k.replace("module.", ""): _v for _k, _v in _raw.items()}
+        _m.load_state_dict(_raw, strict=True)
+        _tok = _open_clip.get_tokenizer("ViT-L-14")
+        _m.eval()
+        _embs = []
+        with _torch.no_grad():
+            for _c in _CLASSES:
+                _tf = _F.normalize(_m.encode_text(_tok(_PROMPTS[_c])).float(), dim=-1)
+                _embs.append(_F.normalize(_tf.mean(dim=0, keepdim=True), dim=-1).numpy()[0])
+        del _m
+        return _np.stack(_embs, axis=0)  # (6, 768)
+
+    def _zscore_softmax(_mat, _T=0.5):
+        _z = (_mat - _mat.mean(axis=0, keepdims=True)) / (_mat.std(axis=0, keepdims=True) + 1e-8)
+        _z = _z / _T
+        _z -= _z.max(axis=1, keepdims=True)
+        _e = _np.exp(_z)
+        return (_e / _e.sum(axis=1, keepdims=True)).astype(_np.float32)
+
+    _sym_clip_path = _ART / "clip_teacher_sym_probs.npy"
+    if not _sym_clip_path.is_file():
+        _probs_list = []
+        for _mname, _repo, _fn in [
+            ("RemoteCLIP", "chendelong/RemoteCLIP", "RemoteCLIP-ViT-L-14.pt"),
+            ("SkyCLIP", "furiousteabag/SkyCLIP", "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"),
+        ]:
+            _cmat = _encode_prompts_cpu(_repo, _fn)
+            _epre = _np.load(_ART / f"emb_{_mname}_pre.npy")
+            _epost = _np.load(_ART / f"emb_{_mname}_post.npy")
+            _f_mean = 0.5 * (_epre + _epost)
+            _f_abs = _np.abs(_epost - _epre)
+            _f_sym = _np.concatenate([_f_mean, _f_abs], axis=1).astype(_np.float32)
+            _np.save(_ART / f"emb_{_mname}_sym.npy", _f_sym)
+
+            _s_pre = _epre @ _cmat.T
+            _s_post = _epost @ _cmat.T
+            _s_max = _np.maximum(_s_pre, _s_post)
+            _ediff_raw = _epost - _epre
+            _ediff = _ediff_raw / (_np.linalg.norm(_ediff_raw, axis=1, keepdims=True) + 1e-8)
+            if _mname == "RemoteCLIP" and (_ART / "emb_RemoteCLIP_diff_hflip.npy").is_file():
+                _ediff_fl = _np.load(_ART / "emb_RemoteCLIP_diff_hflip.npy")
+                _ediff = 0.5 * (_ediff + _ediff_fl)
+                _ediff = _ediff / (_np.linalg.norm(_ediff, axis=1, keepdims=True) + 1e-8)
+            _s_abs_dir = _np.abs(_ediff @ _cmat.T)
+            _s_sym = 0.55 * _s_max + 0.45 * _s_abs_dir
+            _probs_list.append(_zscore_softmax(_s_sym, _T=0.5))
+
+        _p_clip_sym = (0.55 * _probs_list[0] + 0.45 * _probs_list[1]).astype(_np.float32)
+        _np.save(_sym_clip_path, _p_clip_sym)
+    else:
+        _p_clip_sym = _np.load(_sym_clip_path)
+
+    _preds = _p_clip_sym.argmax(axis=1)
+    _vc = _pd.Series([_CLASSES[_i] for _i in _preds]).value_counts()
+    _df_clip_sym = _pd.DataFrame([
+        {"Kelas": _c, "Jumlah": int(_vc.get(_c, 0)), "Persen (%)": round(int(_vc.get(_c, 0)) / len(_preds) * 100, 2)}
+        for _c in _CLASSES
+    ])
+    print("Distribusi Symmetric CLIP Teacher (f_sym, z-score centered, swap-invariant):")
+    print(_df_clip_sym.to_string(index=False))
+
+    _plt.close("all")
+    _fig, _ax = _plt.subplots(figsize=(8, 3.8))
+    _ax.bar(_df_clip_sym["Kelas"], _df_clip_sym["Persen (%)"], color="#2b6cb0")
+    _ax.axhline(100 / 6, color="#e53e3e", linestyle="--", label="Seragam Ideal (16.67%)")
+    _ax.set_title("Distribusi Symmetric CLIP Teacher (Invarian Pre<->Post, Z-Score Centered)")
+    _ax.set_ylabel("Persentase (%)")
+    _ax.legend()
+    _fig.tight_layout()
+    _fig
+    return
+
+
+@app.cell
+def K19b_vlm32b_teacher(mo):
+    # Bagian 19B: Audit Qwen2.5-VL-32B-Instruct (448x448 + 2x HFlip TTA),
+    # Targeted Symmetric Re-Pass [post | pre] pada 556 sampel is_sem_both_neg,
+    # Fusi Konsensus dengan Symmetric CLIP Teacher -> pseudo_labels_v2.parquet & folds_skf5.npy.
+    import gc as _gc
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import numpy as _np
+    import pandas as _pd
+    import matplotlib as _mpl
+    _mpl.use("Agg")
+    import matplotlib.pyplot as _plt
+    from PIL import Image as _Image
+    import torch as _torch
+    import torch.nn.functional as _F
+    import transformers as _transformers
+    from sklearn.model_selection import StratifiedKFold as _SKF
+
+    _ART = _Path("/marimo/Fenomena")
+    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
+    _df_for = _pd.read_parquet(_ART / "forensic_math_audit.parquet")
+    _lo = _np.load(_ART / "vlm32b_raw_logits_orig.npy")
+    _lf = _np.load(_ART / "vlm32b_raw_logits_flip.npy")
+
+    _repass_path = _ART / "vlm32b_repass556_logits.npy"
+    _inv_idx = _np.where(_df_for["is_sem_both_neg"].values)[0]
+
+    if not _repass_path.is_file():
+        print(f"Menjalankan Targeted Symmetric Re-Pass [post | pre] pada {len(_inv_idx)} sampel is_sem_both_neg...", flush=True)
+        _SYM_PROMPT = (
+            "You are a disaster remote-sensing expert analyzing a side-by-side satellite image pair of the same location.\n"
+            "IMPORTANT: LEFT and RIGHT may be in either chronological order; classify the disaster visible in whichever image shows damage, burn scar, rubble, ash, flooding, or blast crater.\n"
+            "Classify into EXACTLY ONE of: Earthquake, Fire, Hurricane, Tsunami, Volcano, Explosion.\n"
+            "- Fire: blackened/charred vegetation burn scar or active wildfire smoke plumes while roads/buildings remain intact.\n"
+            "- Explosion: localized blast crater or structural destruction radiating radially from one epicenter.\n"
+            "- Earthquake: collapsed buildings, gray concrete rubble piles, cracked urban blocks without wide burn scars or coastal wave sweep.\n"
+            "- Hurricane: widespread wind damage (stripped roofs, uprooted trees, inland storm flooding).\n"
+            "- Tsunami: coastal zone with eroded shoreline, beachfront buildings swept bare, and muddy seawater deposits inland.\n"
+            "- Volcano: thick gray/white volcanic ash blanket, pyroclastic deposits, or dark lava streams.\n"
+            "Answer with the exact single class name ONLY."
+        )
+        _MID = "Qwen/Qwen2.5-VL-32B-Instruct"
+        _cls = getattr(_transformers, "Qwen2_5_VLForConditionalGeneration", None) or getattr(_transformers, "AutoModelForImageTextToText", None)
+        _proc = _transformers.AutoProcessor.from_pretrained(_MID, trust_remote_code=True, min_pixels=448*448, max_pixels=896*448+4096)
+        _proc.tokenizer.padding_side = "left"
+        _tok = _proc.tokenizer
+        _tok_pairs = [(_tok.encode(_c, add_special_tokens=False)[0], _tok.encode(" " + _c, add_special_tokens=False)[0]) for _c in _CLASSES]
+        _mdl = _cls.from_pretrained(_MID, dtype=_torch.bfloat16, trust_remote_code=True, attn_implementation="sdpa").cuda().eval()
+
+        def _mk_swapped(_r, _hf=False):
+            with _Image.open(_r["path_post"]) as _i1, _Image.open(_r["path_pre"]) as _i2:
+                _a = _i1.convert("RGB").resize((448, 448), _Image.Resampling.BILINEAR)
+                _b = _i2.convert("RGB").resize((448, 448), _Image.Resampling.BILINEAR)
+            if _hf:
+                _a = _a.transpose(_Image.Transpose.FLIP_LEFT_RIGHT)
+                _b = _b.transpose(_Image.Transpose.FLIP_LEFT_RIGHT)
+            _cv = _Image.new("RGB", (896, 448))
+            _cv.paste(_a, (0, 0))
+            _cv.paste(_b, (448, 0))
+            return _cv
+
+        _re_rows = _df_inv.iloc[_inv_idx].to_dict("records")
+        _re_logits = _np.zeros((len(_re_rows), 6), dtype=_np.float32)
+        _BS = 16
+        _nb = (len(_re_rows) + _BS - 1) // _BS
+        with _torch.no_grad():
+            for _bi in range(_nb):
+                _ch = _re_rows[_bi * _BS : (_bi + 1) * _BS]
+                _l_acc = None
+                for _hf in (False, True):
+                    with _TPE(max_workers=8) as _ex:
+                        _ims = list(_ex.map(lambda r: _mk_swapped(r, _hf), _ch))
+                    _msgs = [[{"role": "user", "content": [{"type": "image", "image": _im}, {"type": "text", "text": _SYM_PROMPT}]}] for _im in _ims]
+                    _txts = [_proc.apply_chat_template(_m, tokenize=False, add_generation_prompt=True) for _m in _msgs]
+                    _inp = _proc(text=_txts, images=_ims, padding=True, return_tensors="pt").to("cuda")
+                    _out = _mdl(**_inp, use_cache=False).logits[:, -1, :].float()
+                    _sc = _torch.stack([_torch.logsumexp(_torch.stack([_out[:, _a], _out[:, _b]], -1), -1) for _a, _b in _tok_pairs], -1).cpu().numpy()
+                    _l_acc = _sc if _l_acc is None else (_l_acc + _sc)
+                _re_logits[_bi * _BS : (_bi + 1) * _BS] = 0.5 * _l_acc
+                if (_bi + 1) % 5 == 0 or (_bi + 1) == _nb:
+                    print(f"  Re-pass batch {_bi+1}/{_nb} selesai", flush=True)
+
+        _np.save(_repass_path, _re_logits)
+        _mdl.cpu()
+        del _mdl, _proc
+        _gc.collect()
+        _torch.cuda.empty_cache()
+
+    _re_logits = _np.load(_repass_path)
+    _avg_vlm_logits = 0.5 * (_lo + _lf)
+    # Gabungkan 50% [pre|post] + 50% [post|pre] simetris pada 556 sampel is_sem_both_neg
+    _avg_vlm_logits[_inv_idx] = 0.5 * _avg_vlm_logits[_inv_idx] + 0.5 * _re_logits
+
+    # De-biasing prior kolom kelas (alpha=0.92) + kalibrasi suhu T=0.75
+    _centered = _avg_vlm_logits - 0.92 * _avg_vlm_logits.mean(axis=0, keepdims=True)
+    _centered = _centered / (_centered.std() + 1e-8) * 1.5
+    _p_vlm32b = _F.softmax(_torch.tensor(_centered) / 0.75, dim=-1).numpy().astype(_np.float32)
+    _np.save(_ART / "vlm32b_teacher_probs.npy", _p_vlm32b)
+
+    _p_clip_sym = _np.load(_ART / "clip_teacher_sym_probs.npy")
+    _cons_soft = (0.72 * _p_vlm32b + 0.28 * _p_clip_sym).astype(_np.float32)
+    _cons_soft /= _cons_soft.sum(axis=1, keepdims=True)
+    _np.save(_ART / "consensus_soft_v1.npy", _cons_soft)
+
+    _vlm_arg = _p_vlm32b.argmax(axis=1)
+    _clip_arg = _p_clip_sym.argmax(axis=1)
+    _cons_arg = _cons_soft.argmax(axis=1)
+    _agree = (_vlm_arg == _clip_arg)
+    _sw = (0.65 + 0.35 * _agree.astype(_np.float32)).astype(_np.float32)
+
+    _df_v2 = _pd.DataFrame({
+        "id": _df_inv["id"],
+        "vlm32b_label": [_CLASSES[_i] for _i in _vlm_arg],
+        "vlm32b_conf": _p_vlm32b.max(axis=1),
+        "vlm32b_tta_agree": (_lo.argmax(axis=1) == _lf.argmax(axis=1)),
+        "clip_label": [_CLASSES[_i] for _i in _clip_arg],
+        "clip_conf": _p_clip_sym.max(axis=1),
+        "consensus_label": [_CLASSES[_i] for _i in _cons_arg],
+        "consensus_conf": _cons_soft.max(axis=1),
+        "teacher_agree": _agree,
+        "sample_weight": _sw,
+    })
+    _df_v2.to_parquet(_ART / "pseudo_labels_v2.parquet", index=False)
+
+    _skf = _SKF(n_splits=5, shuffle=True, random_state=42)
+    _folds = _np.zeros(len(_df_v2), dtype=_np.int64)
+    for _fi, (_, _vi) in enumerate(_skf.split(_df_v2, _df_v2["consensus_label"])):
+        _folds[_vi] = _fi
+    _np.save(_ART / "folds_skf5.npy", _folds)
+
+    _df_v1 = _pd.read_parquet(_ART / "pseudo_labels.parquet")
+    _cmp = _pd.DataFrame([
+        {
+            "Kelas": _c,
+            "V1_7B (%)": round(float((_df_v1["vlm_label"] == _c).mean() * 100), 2),
+            "VLM32B_Sym_Deb (%)": round(float((_df_v2["vlm32b_label"] == _c).mean() * 100), 2),
+            "CLIP_Sym (%)": round(float((_df_v2["clip_label"] == _c).mean() * 100), 2),
+            "Consensus_V2 (n)": int((_df_v2["consensus_label"] == _c).sum()),
+            "Consensus_V2 (%)": round(float((_df_v2["consensus_label"] == _c).mean() * 100), 2),
+        }
+        for _c in _CLASSES
+    ])
+    print(f"VLM32B TTA agree: {(_lo.argmax(1)==_lf.argmax(1)).mean()*100:.2f}% | VLM-CLIP agree: {_agree.mean()*100:.2f}% | folds_skf5 locked!")
+    print(_cmp.to_string(index=False))
+
+    _plt.close("all")
+    _fig, _ax = _plt.subplots(figsize=(9.5, 4.2))
+    _x = _np.arange(len(_CLASSES))
+    _w = 0.35
+    _ax.bar(_x - _w/2, _cmp["V1_7B (%)"], _w, label="Baseline V1 (Qwen-7B)", color="#e53e3e", alpha=0.8)
+    _ax.bar(_x + _w/2, _cmp["Consensus_V2 (%)"], _w, label="Multi-Teacher V2 (32B Sym + CLIP Sym)", color="#2f855a", alpha=0.9)
+    _ax.axhline(100/6, color="#4a5568", ls="--", lw=1.2, label="Seragam Ideal (16.67%)")
+    _ax.set_xticks(_x)
+    _ax.set_xticklabels(_CLASSES)
+    _ax.set_ylabel("Persentase (%)")
+    _ax.set_title("Perbandingan Distribusi Pseudo-Label: V1 (Bias Fire 61.6%) vs Multi-Teacher V2")
+    _ax.legend()
+    _fig.tight_layout()
+    mo.status.toast(title="Fase 1 Selesai", description="pseudo_labels_v2.parquet & folds_skf5.npy terkunci")
+    _fig
+    return
+
+
+@app.cell(hide_code=True)
+def M20_forensic(mo):
+    mo.md("""
+    ## 20. Audit Forensik Matematis: Deteksi Inversi Kronologis (`pre ↔ post`) & Anomali Sensor
+
+    - **Tujuan tahap:** Membuktikan secara kuantitatif pada seluruh **3.180 pasangan** (`pre.jpg` vs `post.jpg`) apakah terdapat pasangan yang tertukar urutan waktunya (*temporal inversion* `pre ↔ post`), artefak *scanline* sensor, atau perbedaan geometri *warping*, sebelum melanjutkan ke pelatihan model.
+    - **4 Pengujian Matematis:**
+      1. **Asimetri Vektor Semantik (`RemoteCLIP` & `SkyCLIP`):** Mengukur *Temporal Damage Gradient* ($\Delta S_{	ext{sem}}$) antara jangkar *Disaster* vs *Intact*, *Antisymmetric Class Projection Ratio*, korelasi Spearman ($
+    ho$), dan Cohen's Kappa ($\kappa$).
+      2. **Forensik Fisika Citra & FFT:** Varians Laplacian, rasio energi frekuensi tinggi 2D FFT ($R_{	ext{HF}}$), rasio puncak spektral *scanline* 1D FFT vertikal, $\Delta 	ext{ExG}$ (*Excess Green Index*), rasio piksel gelap (`<45`), serta fraksi & konkavitas *black padding*.
+      3. **Uji Normalitas & Dekomposisi GMM:** Uji D'Agostino-Pearson $K^2$, *skewness/kurtosis*, perbandingan `GMM(2)` vs `GMM(1)` ($\Delta 	ext{BIC}$) pada skor komposit $Z_{	ext{dir}}$, serta uji Mann-Whitney U & Kolmogorov-Smirnov.
+      4. **Audit Silang & Visualisasi:** Uji $\chi^2$ terhadap `pseudo_labels.parquet` (VLM 7B) dan `SSIM`, serta grid Top-12 & tabel Top-15 `Id` paling terbalik.
+    - **Temuan Kunci:**
+      - `RemoteCLIP` mendeteksi **`1.102/3.180` (`34.65%`)** dengan $\Delta S_{	ext{sem}} < 0$ dan `SkyCLIP` **`1.054/3.180` (`33.14%`)**, dengan konsistensi signifikan lintas model ($
+    ho = 0.4359, p = 1.28 	imes 10^{-147}$; $\kappa = 0.2676$; **`556` pasangan (`17.48%`)** keduanya negatif).
+      - Sebanyak **`43.68%`** pasangan memiliki $\Delta 	ext{ExG} > 0$ (`post` lebih hijau dari `pre`), **`52.48%`** memiliki $R_{	ext{HF}} < 0$, dan **`~72%`** memiliki anomali *scanline* ekstrem (`ratio > 50`) pada `pre` maupun `post`.
+      - Nilai $\Delta 	ext{BIC} = -36.83$ pada $Z_{	ext{dir}}$ (`std=0.5055`, pusat `0.000`) menunjukkan spektrum arah kronologis kontinu yang melintasi nol secara luas (bukan sekadar outlier kecil), dan VLM 7B tetap memprediksi `Fire` secara seragam tanpa membedakan arah terbalik ($\chi^2 = 1.77, p = 0.880$).
+      - **Rekomendasi Arsitektur:** **WAJIB** menggunakan **Symmetric Temporal-Swap Invariant Fusion** (mis. `|f_post - f_pre|` + `0.5*(f_pre + f_post)` + `max(f_pre, f_post)`) dan/atau **Bidirectional Swap-TTA** (`0.5*(P(pre, post) + P(post, pre))`) agar model kebal terhadap *temporal inversion*.
+    """)
+    return
+
+
+@app.cell
+def K20_forensic(mo):
+    # Audit Forensik Matematis lengkap (4 Pengujian Wajib) pada 3.180 pasangan citra:
+    # asimetri semantik RemoteCLIP/SkyCLIP, fisika/FFT 2D & 1D, dekomposisi GMM Z_dir, dan visualisasi Top-12 terbalik.
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import cv2 as _cv2
+    import numpy as _np
+    import pandas as _pd
+    import matplotlib as _mpl
+    _mpl.use("Agg")
+    import matplotlib.pyplot as _plt
+    from scipy import stats as _stats
+    from sklearn.metrics import cohen_kappa_score as _kappa
+    from sklearn.mixture import GaussianMixture as _GMM
+    import torch as _torch
+    import torch.nn.functional as _F
+    import open_clip as _open_clip
+    from huggingface_hub import hf_hub_download as _hf_dl
+
+    _ART = _Path("/marimo/Fenomena")
+    _AUDIT_PQ = _ART / "forensic_math_audit.parquet"
+    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+
+    if not _AUDIT_PQ.is_file():
+        # Jalankan penuh 4 pengujian jika belum ada cache parquet
+        exec(open(_ART / "run_forensic_audit.py", encoding="utf-8").read(), {})
+
+    df_forensic = _pd.read_parquet(_AUDIT_PQ)
+    _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
+
+    # Ringkasan Test 1: Asimetri Semantik
+    _rc_neg = df_forensic["dS_sem_RemoteCLIP"].values < 0
+    _sc_neg = df_forensic["dS_sem_SkyCLIP"].values < 0
+    _rho, _p_rho = _stats.spearmanr(df_forensic["dS_sem_RemoteCLIP"], df_forensic["dS_sem_SkyCLIP"])
+    _kap = _kappa(_rc_neg.astype(int), _sc_neg.astype(int))
+
+    _t1_df = _pd.DataFrame([
+        {"Model": "RemoteCLIP", "dS_sem < 0": int(_rc_neg.sum()), "Persen (%)": round(float(_rc_neg.mean()*100), 2),
+         "Mean dS_sem": round(float(df_forensic["dS_sem_RemoteCLIP"].mean()), 5),
+         "ACPR < 0 (%)": round(float((df_forensic["acpr_diff_RemoteCLIP"] < 0).mean()*100), 2)},
+        {"Model": "SkyCLIP", "dS_sem < 0": int(_sc_neg.sum()), "Persen (%)": round(float(_sc_neg.mean()*100), 2),
+         "Mean dS_sem": round(float(df_forensic["dS_sem_SkyCLIP"].mean()), 5),
+         "ACPR < 0 (%)": round(float((df_forensic["acpr_diff_SkyCLIP"] < 0).mean()*100), 2)},
+    ])
+    print("=== TEST 1: ASIMETRI VEKTOR SEMANTIK ===")
+    print(_t1_df.to_string(index=False))
+    print(f"Spearman rho={_rho:.4f} (p={_p_rho:.2e}) | Cohen kappa={_kap:.4f} | Keduanya <0: {int((_rc_neg & _sc_neg).sum())}/3180 ({(_rc_neg & _sc_neg).mean()*100:.2f}%)")
+
+    # Ringkasan Test 2: Fisika, FFT & Geometri
+    _t2_df = _pd.DataFrame([
+        {"Metrik": "d_log_lap (post<pre %)", "Nilai": f"{df_forensic['d_log_lap'].mean():.4f} ({(df_forensic['d_log_lap']<0).mean()*100:.2f}%)"},
+        {"Metrik": "R_HF 2D-FFT (R_HF<0 %)", "Nilai": f"{df_forensic['R_HF'].mean():.4f} ({(df_forensic['R_HF']<0).mean()*100:.2f}%)"},
+        {"Metrik": "Scanline >50 (pre / post)", "Nilai": f"{int((df_forensic['scanline_pre']>50).sum())} / {int((df_forensic['scanline_post']>50).sum())}"},
+        {"Metrik": "d_ExG (post lebih hijau %)", "Nilai": f"{df_forensic['d_exg'].mean():.4f} ({(df_forensic['d_exg']>0).mean()*100:.2f}%)"},
+        {"Metrik": "d_dark (<45) (d_dark<0 %)", "Nilai": f"{df_forensic['d_dark'].mean():.4f} ({(df_forensic['d_dark']<0).mean()*100:.2f}%)"},
+        {"Metrik": "|pad_pre - pad_post| > 2%", "Nilai": f"{int((_np.abs(df_forensic['pad_frac_pre']-df_forensic['pad_frac_post'])>0.02).sum())} / 3180"},
+    ])
+    print("\n=== TEST 2: FORENSIK FISIKA, FFT & GEOMETRI ===")
+    print(_t2_df.to_string(index=False))
+
+    # Ringkasan Test 3: GMM & Normalitas Z_dir
+    _z = df_forensic["Z_dir"].values
+    _k2, _k2p = _stats.normaltest(_z)
+    _gmm1 = _GMM(n_components=1, random_state=42).fit(_z[:, None])
+    _gmm2 = _GMM(n_components=2, random_state=42, n_init=10).fit(_z[:, None])
+    _bic1, _bic2 = float(_gmm1.bic(_z[:, None])), float(_gmm2.bic(_z[:, None]))
+    _inv_m = df_forensic["is_inverted"].values
+    _mw_u, _mw_p = _stats.mannwhitneyu(_z[_inv_m], _z[~_inv_m], alternative="less")
+    _ks_d, _ks_p = _stats.ks_2samp(_z[_inv_m], _z[~_inv_m])
+    print(f"\n=== TEST 3: UJI STATISTIK & GMM Z_dir ===")
+    print(f"Normaltest K2={_k2:.2f} (p={_k2p:.2e}) | Skew={_stats.skew(_z):.4f} | ExKurt={_stats.kurtosis(_z, fisher=True):.4f}")
+    print(f"BIC(1)={_bic1:.2f} | BIC(2)={_bic2:.2f} | Delta_BIC={_bic1-_bic2:.2f} | is_inverted={int(_inv_m.sum())}/3180 ({_inv_m.mean()*100:.2f}%)")
+    print(f"Mann-Whitney p={_mw_p:.2e} | KS D={_ks_d:.4f} (p={_ks_p:.2e})")
+
+    # Ringkasan Test 4: Audit Silang & Top-15 Id
+    _ct = _pd.crosstab(df_forensic["is_sem_both_neg"], df_forensic["vlm_label"])
+    _chi2, _chip, _, _ = _stats.chi2_contingency(_ct)
+    print(f"\n=== TEST 4: AUDIT SILANG VLM 7B vs is_sem_both_neg (chi2={_chi2:.2f}, p={_chip:.3f}) ===")
+    print(_ct.to_string())
+
+    _top15 = df_forensic.sort_values("Z_dir", ascending=True).head(15)
+    print("\n=== TOP-15 ID PALING TERBALIK (Z_dir TERENDAH) ===")
+    print(_top15[["id", "Z_dir", "p_inverted_gmm", "dS_sem_RemoteCLIP", "dS_sem_SkyCLIP", "d_exg", "d_dark", "R_HF", "ssim", "vlm_label"]].round(4).to_string(index=False))
+
+    # Plot 1: Distribusi Z_dir + Kurva 2-GMM & Scatter RemoteCLIP vs SkyCLIP
+    _plt.close("all")
+    _fig, _axes = _plt.subplots(1, 2, figsize=(13, 4.5))
+    _xs = _np.linspace(_z.min(), _z.max(), 400)[:, None]
+    _axes[0].hist(_z, bins=45, density=True, alpha=0.55, color="#3182ce", edgecolor="white", label="Histogram Z_dir")
+    _axes[0].plot(_xs.ravel(), _np.exp(_gmm1.score_samples(_xs)), "k--", lw=1.8, label=f"GMM-1 (BIC={_bic1:.0f})")
+    _axes[0].plot(_xs.ravel(), _np.exp(_gmm2.score_samples(_xs)), "r-", lw=2.0, label=f"GMM-2 (BIC={_bic2:.0f})")
+    _axes[0].axvline(0, color="#1a202c", ls=":", lw=1.4, label="Z_dir = 0")
+    _axes[0].set_title("Dekomposisi GMM pada Skor Arah Kronologis Z_dir")
+    _axes[0].set_xlabel("Z_dir (<0 = terindikasi terbalik, >0 = normal)")
+    _axes[0].set_ylabel("Densitas")
+    _axes[0].legend(fontsize=8)
+
+    _axes[1].scatter(df_forensic["dS_sem_RemoteCLIP"], df_forensic["dS_sem_SkyCLIP"], s=6, alpha=0.35, color="#805ad5")
+    _axes[1].axhline(0, color="red", ls="--", lw=1.0)
+    _axes[1].axvline(0, color="red", ls="--", lw=1.0)
+    _axes[1].set_title(f"Asimetri Semantik: RemoteCLIP vs SkyCLIP (rho={_rho:.3f})")
+    _axes[1].set_xlabel("dS_sem RemoteCLIP")
+    _axes[1].set_ylabel("dS_sem SkyCLIP")
+    _fig.tight_layout()
+
+    _top12_img = _plt.imread(_ART / "forensic_inverted_top12.png")
+    mo.vstack([
+        _fig,
+        mo.md("**Grid Top-12 Pasangan Paling Terbalik (`[Kiri=pre.jpg | Kanan=post.jpg]`):**"),
+        mo.image(_top12_img, width=960),
+    ])
+    return
+
+
+@app.cell(hide_code=True)
+def M21_fold0_screening(mo):
+    mo.md("""
+    ## 21. Fase 2 — Skrining Hipotesis di Fold 0 (`experiment_tracker.csv`)
+
+    - **Desain Arsitektur Inti (`SymmetricSiameseNet`):** Mengadopsi hasil Audit Forensik (Cell 20), fusi fitur menggunakan tiga komponen invarian urutan: `[0.5*(f_pre + f_post), max(f_pre, f_post), |f_post - f_pre|]` dengan *Channel Attention* 1D, *Random Temporal Swap* (`p=0.5`) saat training, dan *Bidirectional Swap-TTA* saat validasi. Loss memakai *soft-target cross-entropy* terhadap `consensus_soft_v1.npy` dengan *damped inverse class weights* (`freq^-0.65`) dan `MixUp(alpha=0.2)`.
+    - **Aturan Keep / Rollback:** Sebuah modifikasi dipertahankan **hanya jika** `Fold 0 Validation LogLoss` turun **DAN** `Fold 0 Out-of-Sample Calibrated Macro F1` naik dibanding *best checkpoint* sebelumnya.
+    - **Hipotesis yang Diuji:**
+      - **Iter 0 (Baseline Simetris):** `384x384` RGB standar.
+      - **Iter 1 (LAB CLAHE Luminance Norm):** Normalisasi kontras lokal hanya pada kanal `L*` (`clipLimit=2.0`) untuk menekan *KL color/illumination shift* (`1.88–2.06`) tanpa merusak kanal warna `a*, b*`.
+      - **Iter 2 (Augmentasi Dihedral D4 + Photometric Independen + Simulasi Awan):** `RandomResizedCrop(0.75, 1.0)` + rotasi D4 (`0/90/180/270` + H/V flip) identik, serta `ColorJitter` + `RandomGamma` + `RandomErasing` independen per citra.
+      - **Iter 3 (Resolusi Tinggi `448x448`):** Menguji ketajaman deteksi kawah ledakan kecil (*Explosion*) dan puing bangunan (*Earthquake*).
+    """)
+    return
+
+
+@app.cell
+def K21a_fold0_iter0_1():
+    # Fase 2A: Definisi SymmetricSiameseNet, fungsi skrining Fold 0 + OOS Calibrated Macro F1,
+    # dan eksekusi Iter 0 (Baseline Simetris 384) + Iter 1 (LAB CLAHE Luminance Norm).
+    import gc as _gc
     import math as _math
     import time as _time
-    import gc as _gc
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import cv2 as _cv2
+    import numpy as _np
+    import pandas as _pd
+    from PIL import Image as _Image
+    from scipy.optimize import minimize as _minimize
+    from sklearn.metrics import f1_score as _f1_score, log_loss as _log_loss
+    import torch as _torch
+    import torch.nn as _nn
     import torch.nn.functional as _F
-    from sklearn.metrics import f1_score
+    import timm as _timm
 
-    # Preload seluruh 3.180 pasang uint8 (2.8 GB) ke VRAM (102 GB) agar 0 bottleneck CPU/I/O
-    _ID_TO_POS = {_sid: _i for _i, _sid in enumerate(df_inv_clean["id"])}
-    _pre_stack = np.stack([IMG_CACHE_384[_sid][0] for _sid in df_inv_clean["id"]], axis=0)  # (N, 384, 384, 3)
-    _post_stack = np.stack([IMG_CACHE_384[_sid][1] for _sid in df_inv_clean["id"]], axis=0)
-    GPU_PRE_U8 = torch.from_numpy(_pre_stack).permute(0, 3, 1, 2).contiguous().cuda()
-    GPU_POST_U8 = torch.from_numpy(_post_stack).permute(0, 3, 1, 2).contiguous().cuda()
-    del _pre_stack, _post_stack
+    _torch.backends.cudnn.benchmark = True
+    _ART = _Path("/marimo/Fenomena")
+    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
+    _df_v2 = _pd.read_parquet(_ART / "pseudo_labels_v2.parquet")
+    _y_soft = _np.load(_ART / "consensus_soft_v1.npy").astype(_np.float32)
+    _folds = _np.load(_ART / "folds_skf5.npy")
+    _sw = _df_v2["sample_weight"].values.astype(_np.float32)
+    _y_hard = _y_soft.argmax(axis=1)
 
-    _GPU_MEAN = IMAGENET_MEAN.cuda().view(1, 3, 1, 1)
-    _GPU_STD = IMAGENET_STD.cuda().view(1, 3, 1, 1)
+    # Damped inverse frequency weights (freq^-0.65, normalized to mean=1.0)
+    _counts = _np.bincount(_y_hard, minlength=6).astype(_np.float32)
+    _cw_np = _np.power(_np.maximum(_counts, 1.0), -0.65)
+    _cw_np = _cw_np / _cw_np.mean()
+    _CW_TENSOR = _torch.tensor(_cw_np, dtype=_torch.float32, device="cuda")
 
-    def _gpu_color_jitter(_x, _bright=0.3, _cont=0.3, _sat=0.2, _hue=0.05):
-        _b = _x.shape[0]
-        _dev = _x.device
-        # Brightness
-        _bf = (1.0 - _bright) + 2.0 * _bright * torch.rand(_b, 1, 1, 1, device=_dev, dtype=_x.dtype)
-        _x = (_x * _bf).clamp(0.0, 1.0)
-        # Contrast
-        _gray = 0.2989 * _x[:, 0:1] + 0.5870 * _x[:, 1:2] + 0.1140 * _x[:, 2:3]
-        _gmean = _gray.mean(dim=(2, 3), keepdim=True)
-        _cf = (1.0 - _cont) + 2.0 * _cont * torch.rand(_b, 1, 1, 1, device=_dev, dtype=_x.dtype)
-        _x = (_x * _cf + _gmean * (1.0 - _cf)).clamp(0.0, 1.0)
-        # Saturation
-        _sf = (1.0 - _sat) + 2.0 * _sat * torch.rand(_b, 1, 1, 1, device=_dev, dtype=_x.dtype)
-        _x = (_x * _sf + _gray * (1.0 - _sf)).clamp(0.0, 1.0)
-        # Subtle hue channel rotation
-        _hf = (2.0 * torch.rand(_b, 1, 1, 1, device=_dev, dtype=_x.dtype) - 1.0) * _hue * _math.pi
-        _cos_h = torch.cos(_hf)
-        _sin_h = torch.sin(_hf)
-        _r, _g, _bl = _x[:, 0:1], _x[:, 1:2], _x[:, 2:3]
-        _y = 0.299 * _r + 0.587 * _g + 0.114 * _bl
-        _i = 0.596 * _r - 0.274 * _g - 0.322 * _bl
-        _q = 0.211 * _r - 0.523 * _g + 0.312 * _bl
-        _i2 = _i * _cos_h - _q * _sin_h
-        _q2 = _i * _sin_h + _q * _cos_h
-        _r2 = _y + 0.956 * _i2 + 0.621 * _q2
-        _g2 = _y - 0.272 * _i2 - 0.647 * _q2
-        _b2 = _y - 1.106 * _i2 + 1.703 * _q2
-        return torch.cat([_r2, _g2, _b2], dim=1).clamp(0.0, 1.0)
+    _IMG_MEAN = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
+    _IMG_STD = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
 
-    def _gpu_augment_batch(_p1, _p2):
+    class ChannelAttention1D(_nn.Module):
+        def __init__(self, dim, reduction=8):
+            super().__init__()
+            _h = max(dim // reduction, 16)
+            self.net = _nn.Sequential(_nn.Linear(dim, _h), _nn.GELU(), _nn.Linear(_h, dim), _nn.Sigmoid())
+        def forward(self, x):
+            return x * self.net(x)
+
+    class SymmetricSiameseNet(_nn.Module):
+        """Siamese shared-backbone dengan fusi 100% simetris: [mean, max, |diff|*attn]."""
+        def __init__(self, backbone_name="efficientnet_b4", num_classes=6, pretrained=True):
+            super().__init__()
+            self.backbone = _timm.create_model(backbone_name, pretrained=pretrained, num_classes=0, features_only=False)
+            _d = self.backbone.num_features
+            self.diff_attn = ChannelAttention1D(_d, reduction=8)
+            self.head = _nn.Sequential(
+                _nn.Linear(_d * 3, _d),
+                _nn.GELU(),
+                _nn.Dropout(0.3),
+                _nn.Linear(_d, num_classes),
+            )
+        def forward(self, pre, post):
+            _f1 = self.backbone(pre)
+            _f2 = self.backbone(post)
+            _f_mean = 0.5 * (_f1 + _f2)
+            _f_max = _torch.maximum(_f1, _f2)
+            _f_diff = self.diff_attn(_torch.abs(_f2 - _f1))
+            return self.head(_torch.cat([_f_mean, _f_max, _f_diff], dim=-1))
+
+    def _load_rgb_tensor_pair_cache(_sz=384, _lab_clahe=False):
+        def _one(_r):
+            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            if _lab_clahe:
+                _clahe = _cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                for _arr in (_a1, _a2):
+                    _lab = _cv2.cvtColor(_arr, _cv2.COLOR_RGB2LAB)
+                    _lab[:, :, 0] = _clahe.apply(_lab[:, :, 0])
+                    _arr[:] = _cv2.cvtColor(_lab, _cv2.COLOR_LAB2RGB)
+            return _a1, _a2
+        with _TPE(max_workers=16) as _ex:
+            _res = list(_ex.map(_one, _df_inv.to_dict("records")))
+        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        return _pre_t, _post_t
+
+    def _aug_batch(_p1, _p2, _mode="basic"):
         _b, _, _h, _w = _p1.shape
         _dev = _p1.device
-        # Identical horizontal flip
-        _fmask = torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
-        _p1 = torch.where(_fmask, torch.flip(_p1, dims=[-1]), _p1)
-        _p2 = torch.where(_fmask, torch.flip(_p2, dims=[-1]), _p2)
-        # Identical small rotation (-10..+10 deg)
-        _ang = (torch.rand(_b, device=_dev) * 20.0 - 10.0) * (_math.pi / 180.0)
-        _ca, _sa = torch.cos(_ang), torch.sin(_ang)
-        _zeros = torch.zeros_like(_ang)
-        _theta = torch.stack([
-            torch.stack([_ca, -_sa, _zeros], dim=-1),
-            torch.stack([_sa, _ca, _zeros], dim=-1),
-        ], dim=1)
-        _grid = _F.affine_grid(_theta, _p1.size(), align_corners=False)
-        _p1 = _F.grid_sample(_p1, _grid, mode="bilinear", padding_mode="zeros", align_corners=False)
-        _p2 = _F.grid_sample(_p2, _grid, mode="bilinear", padding_mode="zeros", align_corners=False)
-        # Independent ColorJitter
-        _p1 = _gpu_color_jitter(_p1)
-        _p2 = _gpu_color_jitter(_p2)
+        # Random temporal swap (p=0.5)
+        _sw_mask = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
+        _p1_s = _torch.where(_sw_mask, _p2, _p1)
+        _p2_s = _torch.where(_sw_mask, _p1, _p2)
+        _p1, _p2 = _p1_s, _p2_s
+
+        # Identical HFlip
+        _hf = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
+        _p1 = _torch.where(_hf, _torch.flip(_p1, [-1]), _p1)
+        _p2 = _torch.where(_hf, _torch.flip(_p2, [-1]), _p2)
+
+        if _mode == "d4_full":
+            # Identical VFlip + 90-deg rotations (D4 dihedral)
+            _vf = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
+            _p1 = _torch.where(_vf, _torch.flip(_p1, [-2]), _p1)
+            _p2 = _torch.where(_vf, _torch.flip(_p2, [-2]), _p2)
+            _k = int(_torch.randint(0, 4, (1,)).item())
+            if _k > 0:
+                _p1 = _torch.rot90(_p1, _k, dims=[-2, -1])
+                _p2 = _torch.rot90(_p2, _k, dims=[-2, -1])
+            # Identical RandomResizedCrop (scale 0.75-1.0)
+            _sc = float(_torch.empty(1).uniform_(0.75, 1.0).item())
+            _ch = int(_h * _sc)
+            _top = int(_torch.randint(0, max(_h - _ch + 1, 1), (1,)).item())
+            _left = int(_torch.randint(0, max(_w - _ch + 1, 1), (1,)).item())
+            _p1 = _F.interpolate(_p1[:, :, _top:_top+_ch, _left:_left+_ch], size=(_h, _w), mode="bilinear", align_corners=False)
+            _p2 = _F.interpolate(_p2[:, :, _top:_top+_ch, _left:_left+_ch], size=(_h, _w), mode="bilinear", align_corners=False)
+            # Independent ColorJitter + RandomGamma + small cloud RandomErasing
+            for _arr_ref in (0, 1):
+                _x = _p1 if _arr_ref == 0 else _p2
+                _bf = 0.7 + 0.6 * _torch.rand(_b, 1, 1, 1, device=_dev)
+                _gm = 0.8 + 0.4 * _torch.rand(_b, 1, 1, 1, device=_dev)
+                _x = (_x * _bf).clamp(1e-4, 1.0).pow(_gm)
+                _gray = 0.2989 * _x[:, 0:1] + 0.5870 * _x[:, 1:2] + 0.1140 * _x[:, 2:3]
+                _cf = 0.75 + 0.5 * _torch.rand(_b, 1, 1, 1, device=_dev)
+                _x = (_x * _cf + _gray.mean(dim=(2, 3), keepdim=True) * (1.0 - _cf)).clamp(0.0, 1.0)
+                if _torch.rand(1).item() < 0.3:
+                    _eh, _ew = _h // 8, _w // 8
+                    _ey = int(_torch.randint(0, _h - _eh, (1,)).item())
+                    _ex = int(_torch.randint(0, _w - _ew, (1,)).item())
+                    _x[:, :, _ey:_ey+_eh, _ex:_ex+_ew] = float(_torch.empty(1).uniform_(0.65, 0.95).item())
+                if _arr_ref == 0:
+                    _p1 = _x
+                else:
+                    _p2 = _x
+        else:
+            # Basic independent brightness/contrast
+            for _arr_ref in (0, 1):
+                _x = _p1 if _arr_ref == 0 else _p2
+                _bf = 0.75 + 0.5 * _torch.rand(_b, 1, 1, 1, device=_dev)
+                _x = (_x * _bf).clamp(0.0, 1.0)
+                if _arr_ref == 0:
+                    _p1 = _x
+                else:
+                    _p2 = _x
         return _p1, _p2
 
-    def compute_class_weights_tensor(df, label_col="vlm_label"):
-        _counts = df[label_col].value_counts()
-        _w = np.array([1.0 / max(_counts.get(_c, 1), 1) for _c in CLASS_NAMES], dtype=np.float32)
-        _w = _w / _w.mean()
-        return torch.tensor(_w, dtype=torch.float32, device="cuda")
+    def oos_calibrated_macro_f1(_probs, _y_true, _seed=42):
+        """2-fold nested out-of-sample class-multiplier calibration (0.85x damped) untuk Macro F1."""
+        _rng = _np.random.RandomState(_seed)
+        _perm = _rng.permutation(len(_y_true))
+        _half = len(_y_true) // 2
+        _splits = [(_perm[:_half], _perm[_half:]), (_perm[_half:], _perm[:_half])]
+        _oos_pred = _np.zeros(len(_y_true), dtype=_np.int64)
+        for _fit_i, _eval_i in _splits:
+            _pf, _yf = _probs[_fit_i], _y_true[_fit_i]
+            _mult = _np.ones(6, dtype=_np.float64)
+            for _ in range(3):
+                for _c in range(6):
+                    _best_m, _best_s = _mult[_c], -1.0
+                    for _cand in _np.linspace(0.4, 2.2, 19):
+                        _tmp = _mult.copy()
+                        _tmp[_c] = _cand
+                        _s = _f1_score(_yf, (_pf * _tmp[None, :]).argmax(1), average="macro", zero_division=0)
+                        if _s > _best_s:
+                            _best_s, _best_m = _s, _cand
+                    _mult[_c] = _best_m
+            _mult_damped = 1.0 + 0.85 * (_mult - 1.0)
+            _oos_pred[_eval_i] = (_probs[_eval_i] * _mult_damped[None, :]).argmax(1)
+        return float(_f1_score(_y_true, _oos_pred, average="macro", zero_division=0))
 
-    def run_5fold_training(
-        model_tag,
-        model_cls,
-        df_folds,
-        epochs=30,
-        batch_size=32,
-        lr=3e-4,
-        wd=1e-4,
-        warmup_epochs=5,
-        patience=7,
-        init_ckpt_prefix=None,
-        use_sample_weights=False,
-        out_suffix="",
-    ):
-        _t_start = _time.time()
-        _art = Path(ARTIFACT_DIR)
-        _cw = compute_class_weights_tensor(df_folds)
-        _pos_all = torch.tensor([_ID_TO_POS[_sid] for _sid in df_folds["id"]], dtype=torch.long, device="cuda")
-        _y_all = torch.tensor(df_folds["vlm_label"].map(LABEL2IDX).values, dtype=torch.long, device="cuda")
-        _w_all = torch.tensor(df_folds["sample_weight"].values, dtype=torch.float32, device="cuda") if use_sample_weights else None
+    def run_fold0_experiment(_iter_name, _pre_u8, _post_u8, _aug_mode="basic", _backbone="efficientnet_b4", _epochs=15, _bs=64, _lr=3e-4):
+        _t0 = _time.time()
+        _tr_idx = _torch.tensor(_np.where(_folds != 0)[0], dtype=_torch.long, device="cuda")
+        _va_idx_np = _np.where(_folds == 0)[0]
+        _va_idx = _torch.tensor(_va_idx_np, dtype=_torch.long, device="cuda")
+        _ys_t = _torch.tensor(_y_soft, dtype=_torch.float32, device="cuda")
+        _yh_t = _torch.tensor(_y_hard, dtype=_torch.long, device="cuda")
+        _sw_t = _torch.tensor(_sw, dtype=_torch.float32, device="cuda")
 
-        _oof_probs = np.zeros((len(df_folds), len(CLASS_NAMES)), dtype=np.float32)
-        _y_true_np = df_folds["vlm_label"].map(LABEL2IDX).values
-        _fold_rows = []
+        _mdl = SymmetricSiameseNet(_backbone, num_classes=6, pretrained=True).cuda()
+        _opt = _torch.optim.AdamW(_mdl.parameters(), lr=_lr, weight_decay=1e-4)
+        _wu = _torch.optim.lr_scheduler.LinearLR(_opt, start_factor=0.1, total_iters=3)
+        _cos = _torch.optim.lr_scheduler.CosineAnnealingLR(_opt, T_max=max(_epochs - 3, 1), eta_min=1e-6)
+        _sched = _torch.optim.lr_scheduler.SequentialLR(_opt, schedulers=[_wu, _cos], milestones=[3])
 
-        for _fold in range(5):
-            _tf_s = _time.time()
-            _tr_mask = (df_folds["fold"].values != _fold)
-            _va_idx_np = np.where(df_folds["fold"].values == _fold)[0]
-            _tr_idx_t = torch.tensor(np.where(_tr_mask)[0], dtype=torch.long, device="cuda")
-            _va_idx_t = torch.tensor(_va_idx_np, dtype=torch.long, device="cuda")
+        _best_ll, _best_probs = 999.0, None
+        _n_tr = len(_tr_idx)
+        for _ep in range(1, _epochs + 1):
+            _mdl.train()
+            _perm = _tr_idx[_torch.randperm(_n_tr, device="cuda")]
+            for _s in range(0, _n_tr, _bs):
+                _bi = _perm[_s:_s + _bs]
+                _p1 = _pre_u8[_bi].float().div_(255.0)
+                _p2 = _post_u8[_bi].float().div_(255.0)
+                _p1, _p2 = _aug_batch(_p1, _p2, _mode=_aug_mode)
+                _yt = _ys_t[_bi]
+                _wt = _sw_t[_bi] * _CW_TENSOR[_yh_t[_bi]]
 
-            _model = model_cls(num_classes=len(CLASS_NAMES), pretrained=(init_ckpt_prefix is None)).cuda()
-            if init_ckpt_prefix is not None:
-                _init_p = _art / f"ckpt_{init_ckpt_prefix}_fold{_fold}.pth"
-                _model.load_state_dict(torch.load(_init_p, map_location="cuda", weights_only=True))
+                # Paired MixUp alpha=0.2
+                if _torch.rand(1).item() < 0.7:
+                    _lam = float(_np.random.beta(0.2, 0.2))
+                    _perm_m = _torch.randperm(len(_bi), device="cuda")
+                    _p1 = _lam * _p1 + (1.0 - _lam) * _p1[_perm_m]
+                    _p2 = _lam * _p2 + (1.0 - _lam) * _p2[_perm_m]
+                    _yt = _lam * _yt + (1.0 - _lam) * _yt[_perm_m]
+                    _wt = _lam * _wt + (1.0 - _lam) * _wt[_perm_m]
 
-            _opt = torch.optim.AdamW(_model.parameters(), lr=lr, weight_decay=wd)
-            _wu = torch.optim.lr_scheduler.LinearLR(_opt, start_factor=0.1, total_iters=max(warmup_epochs, 1))
-            _cos = torch.optim.lr_scheduler.CosineAnnealingLR(_opt, T_max=max(epochs - warmup_epochs, 1), eta_min=1e-6)
-            _sched = torch.optim.lr_scheduler.SequentialLR(_opt, schedulers=[_wu, _cos], milestones=[warmup_epochs])
-            _scaler = torch.amp.GradScaler("cuda", enabled=False)
-            _crit = nn.CrossEntropyLoss(weight=_cw, label_smoothing=0.1, reduction="none" if use_sample_weights else "mean")
+                _p1 = (_p1 - _IMG_MEAN) / _IMG_STD
+                _p2 = (_p2 - _IMG_MEAN) / _IMG_STD
+                _opt.zero_grad(set_to_none=True)
+                with _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+                    _logits = _mdl(_p1, _p2)
+                    _loss_vec = -(_yt * _F.log_softmax(_logits.float(), dim=-1)).sum(dim=-1)
+                    _loss = (_loss_vec * _wt).mean()
+                _loss.backward()
+                _opt.step()
+            _sched.step()
 
-            _best_f1 = -1.0
-            _best_probs = None
-            _best_ep = 0
-            _wait = 0
-            _ckpt_path = _art / f"ckpt_{model_tag}{out_suffix}_fold{_fold}.pth"
-            _n_tr = len(_tr_idx_t)
+            # Bidirectional Swap-TTA validation on Fold 0
+            _mdl.eval()
+            _vp_list = []
+            with _torch.no_grad():
+                for _s in range(0, len(_va_idx), _bs * 2):
+                    _vi = _va_idx[_s:_s + _bs * 2]
+                    _p1 = (_pre_u8[_vi].float().div_(255.0) - _IMG_MEAN) / _IMG_STD
+                    _p2 = (_post_u8[_vi].float().div_(255.0) - _IMG_MEAN) / _IMG_STD
+                    with _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+                        _pr1 = _F.softmax(_mdl(_p1, _p2).float(), dim=-1)
+                        _pr2 = _F.softmax(_mdl(_p2, _p1).float(), dim=-1)
+                    _vp_list.append((0.5 * (_pr1 + _pr2)).cpu().numpy())
+            _vp = _np.vstack(_vp_list)
+            _ll = float(_log_loss(_y_hard[_va_idx_np], _np.clip(_vp, 1e-6, 1.0), labels=list(range(6))))
+            if _ll < _best_ll:
+                _best_ll = _ll
+                _best_probs = _vp
+                _torch.save(_mdl.state_dict(), _ART / f"ckpt_f0_{_iter_name}.pth")
+            _rf1 = _f1_score(_y_hard[_va_idx_np], _vp.argmax(1), average="macro", zero_division=0)
+            print(f"  [{_iter_name}] ep={_ep:02d}/{_epochs} val_ll={_ll:.4f} (best={_best_ll:.4f}) raw_f1={_rf1:.4f}", flush=True)
 
-            for _ep in range(1, epochs + 1):
-                _model.train()
-                _perm = _tr_idx_t[torch.randperm(_n_tr, device="cuda")]
-                for _s in range(0, _n_tr, batch_size):
-                    _bi = _perm[_s:_s + batch_size]
-                    _pos = _pos_all[_bi]
-                    _yb = _y_all[_bi]
-                    _p1 = GPU_PRE_U8[_pos].float().div_(255.0)
-                    _p2 = GPU_POST_U8[_pos].float().div_(255.0)
-                    _p1, _p2 = _gpu_augment_batch(_p1, _p2)
-                    _p1 = (_p1 - _GPU_MEAN) / _GPU_STD
-                    _p2 = (_p2 - _GPU_MEAN) / _GPU_STD
+        _raw_f1 = float(_f1_score(_y_hard[_va_idx_np], _best_probs.argmax(1), average="macro", zero_division=0))
+        _cal_f1 = oos_calibrated_macro_f1(_best_probs, _y_hard[_va_idx_np])
+        _dt = round(_time.time() - _t0, 1)
+        del _mdl, _opt, _sched
+        _gc.collect()
+        _torch.cuda.empty_cache()
+        return _best_ll, _raw_f1, _cal_f1, _dt
 
-                    _opt.zero_grad(set_to_none=True)
-                    with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                        _logits = _model(_p1, _p2)
-                        _loss = _crit(_logits, _yb)
-                        if use_sample_weights:
-                            _loss = (_loss * _w_all[_bi]).mean()
-                    _scaler.scale(_loss).backward()
-                    _scaler.step(_opt)
-                    _scaler.update()
-                _sched.step()
+    _tracker_path = _ART / "experiment_tracker.csv"
+    _rows = []
 
-                _model.eval()
-                _vp_list = []
-                with torch.no_grad():
-                    for _s in range(0, len(_va_idx_t), batch_size * 2):
-                        _vi = _va_idx_t[_s:_s + batch_size * 2]
-                        _pos = _pos_all[_vi]
-                        _p1 = (GPU_PRE_U8[_pos].float().div_(255.0) - _GPU_MEAN) / _GPU_STD
-                        _p2 = (GPU_POST_U8[_pos].float().div_(255.0) - _GPU_MEAN) / _GPU_STD
-                        with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                            _pr = _F.softmax(_model(_p1, _p2).float(), dim=-1)
-                        _vp_list.append(_pr.cpu().numpy())
-                _vp = np.vstack(_vp_list)
-                _vy = _y_true_np[_va_idx_np]
-                _f1 = float(f1_score(_vy, _vp.argmax(axis=1), average="macro", zero_division=0))
+    print("=== Iter 0: Baseline Simetris (384x384 RGB) ===", flush=True)
+    _pre_384, _post_384 = _load_rgb_tensor_pair_cache(384, _lab_clahe=False)
+    _ll0, _rf0, _cf0, _dt0 = run_fold0_experiment("iter0_base384", _pre_384, _post_384, _aug_mode="basic", _epochs=15)
+    _rows.append({"iter": "Iter 0 (Base 384 RGB)", "res": 384, "lab_clahe": False, "aug": "basic", "f0_logloss": round(_ll0, 4), "f0_raw_f1": round(_rf0, 4), "f0_cal_f1": round(_cf0, 4), "decision": "BASELINE", "sec": _dt0})
+    _best_ll_s1, _best_cf_s1 = _ll0, _cf0
+    del _pre_384, _post_384
+    _gc.collect()
+    _torch.cuda.empty_cache()
 
-                if _f1 > _best_f1:
-                    _best_f1 = _f1
-                    _best_probs = _vp
-                    _best_ep = _ep
-                    _wait = 0
-                    torch.save(_model.state_dict(), _ckpt_path)
-                else:
-                    _wait += 1
-                print(f'[{model_tag}{out_suffix} F{_fold}] ep={_ep:02d}/{epochs} val_f1={_f1:.4f} best={_best_f1:.4f}', flush=True)
-                if _wait >= patience:
-                    break
+    print("=== Iter 1: LAB CLAHE Luminance Normalization (384x384) ===", flush=True)
+    _pre_lab, _post_lab = _load_rgb_tensor_pair_cache(384, _lab_clahe=True)
+    _ll1, _rf1, _cf1, _dt1 = run_fold0_experiment("iter1_lab384", _pre_lab, _post_lab, _aug_mode="basic", _epochs=15)
+    _keep1 = (_ll1 < _best_ll_s1) and (_cf1 > _best_cf_s1)
+    if _keep1:
+        _best_ll_s1, _best_cf_s1 = _ll1, _cf1
+    _rows.append({"iter": "Iter 1 (LAB CLAHE 384)", "res": 384, "lab_clahe": True, "aug": "basic", "f0_logloss": round(_ll1, 4), "f0_raw_f1": round(_rf1, 4), "f0_cal_f1": round(_cf1, 4), "decision": "KEEP" if _keep1 else "ROLLBACK", "sec": _dt1})
+    del _pre_lab, _post_lab
+    _gc.collect()
+    _torch.cuda.empty_cache()
 
-            _oof_probs[_va_idx_np] = _best_probs
-            _fold_sec = round(_time.time() - _tf_s, 1)
-            _fold_rows.append({"fold": _fold, "best_epoch": _best_ep, "val_macro_f1": round(_best_f1, 4), "sec": _fold_sec})
-            print(f"[{model_tag}{out_suffix}] Fold {_fold} selesai | best_ep={_best_ep} | val_macro_f1={_best_f1:.4f} ({_fold_sec}s)", flush=True)
-            del _model, _opt, _sched
-            _gc.collect()
-            torch.cuda.empty_cache()
+    _df_tr = _pd.DataFrame(_rows)
+    _df_tr.to_csv(_tracker_path, index=False)
+    print("\n=== EXPERIMENT TRACKER (SEMENTARA) ===")
+    print(_df_tr.to_string(index=False))
+    _df_tr
+    return (run_fold0_experiment,)
 
-        _oof_path = _art / f"oof_{model_tag}{out_suffix}.npy"
-        np.save(_oof_path, _oof_probs)
-        _oof_pred = _oof_probs.argmax(axis=1)
-        _overall_f1 = float(f1_score(_y_true_np, _oof_pred, average="macro", zero_division=0))
-        _per_class_f1 = f1_score(_y_true_np, _oof_pred, labels=list(range(6)), average=None, zero_division=0)
-        _cls_dict = {CLASS_NAMES[_i]: round(float(_per_class_f1[_i]), 4) for _i in range(6)}
 
-        _fold_df = pd.DataFrame(_fold_rows)
-        _log_txt = (
-            f"\n## {model_tag}{out_suffix} (epochs={epochs}, lr={lr}, time={_time.time()-_t_start:.1f}s)\n"
-            f"- Overall OOF Macro F1: **{_overall_f1:.4f}** | Mean Fold F1: **{_fold_df['val_macro_f1'].mean():.4f}**\n"
-            f"- Per-Class OOF F1: `{_cls_dict}`\n"
-            + _fold_df.to_string(index=False) + "\n"
-        )
-        with open(_art / "training_log.md", "a", encoding="utf-8") as _f:
-            _f.write(_log_txt)
+@app.cell
+def K21b_fold0_iter2(run_fold0_experiment):
+    # Fase 2B (Iter 2): Uji Augmentasi Dihedral D4 + RandomResizedCrop(0.75-1.0) identik
+    # + ColorJitter/Gamma/Cloud RandomErasing independen pada 384x384 RGB di Fold 0.
+    import gc as _gc
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import cv2 as _cv2
+    import numpy as _np
+    import pandas as _pd
+    import torch as _torch
 
-        print(f"=== {model_tag}{out_suffix} SELESAI ({_time.time()-_t_start:.1f}s) ===", flush=True)
-        print(f"Overall OOF Macro F1: {_overall_f1:.4f} | Mean Fold F1: {_fold_df['val_macro_f1'].mean():.4f}", flush=True)
-        print("Per-class OOF F1:", _cls_dict, flush=True)
-        mo.status.toast(title=f"Training selesai: {model_tag}{out_suffix}", description=f"OOF Macro F1 = {_overall_f1:.4f}")
-        return _oof_probs, _overall_f1, _cls_dict, _fold_df
+    _ART = _Path("/marimo/Fenomena")
+    _df_inv_b = _pd.read_parquet(_ART / "df_inventory.parquet")
 
-    with open(Path(ARTIFACT_DIR) / "training_log.md", "w", encoding="utf-8") as _f:
-        _f.write("# Training Log — Siamese Dual Fusion (Fenomena)\n")
+    def _load_cache_k21b(_sz=384):
+        def _one(_r):
+            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            return _a1, _a2
+        with _TPE(max_workers=16) as _ex:
+            _res = list(_ex.map(_one, _df_inv_b.to_dict("records")))
+        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        return _pre_t, _post_t
 
-    mo.status.toast(title="Training Dual Siamese Dimulai", description="Melatih EfficientNet-B4 (5-Fold)")
-    oof_effb4, f1_effb4_iter1, cls_f1_effb4_iter1, fold_df_effb4 = run_5fold_training(
-        model_tag="effb4",
-        model_cls=SiameseDualFusion,
-        df_folds=df_train_folds,
-        epochs=30,
-        batch_size=32,
-        lr=3e-4,
-        wd=1e-4,
-        warmup_epochs=5,
-        patience=7,
-    )
-    fold_df_effb4
+    print("=== Iter 2: D4 Dihedral + Cloud RandomErasing + Independent Gamma/ColorJitter (384x384) ===", flush=True)
+    _pre_384_i2, _post_384_i2 = _load_cache_k21b(384)
+    _ll2, _rf2, _cf2, _dt2 = run_fold0_experiment("iter2_d4aug384", _pre_384_i2, _post_384_i2, _aug_mode="d4_full", _epochs=15)
+    del _pre_384_i2, _post_384_i2
+    _gc.collect()
+    _torch.cuda.empty_cache()
+
+    _df_prev = _pd.read_csv(_ART / "experiment_tracker.csv")
+    _df_prev = _df_prev[_df_prev["iter"] != "Iter 2 (D4+Cloud Aug 384)"]
+    _keep_base_ll = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_logloss"].min())
+    _keep_base_cf = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_cal_f1"].max())
+    _keep2 = (_ll2 < _keep_base_ll) and (_cf2 > _keep_base_cf)
+
+    _row2 = _pd.DataFrame([{"iter": "Iter 2 (D4+Cloud Aug 384)", "res": 384, "lab_clahe": False, "aug": "d4_full", "f0_logloss": round(_ll2, 4), "f0_raw_f1": round(_rf2, 4), "f0_cal_f1": round(_cf2, 4), "decision": "KEEP" if _keep2 else "ROLLBACK", "sec": _dt2}])
+    _df_tr2 = _pd.concat([_df_prev, _row2], ignore_index=True)
+    _df_tr2.to_csv(_ART / "experiment_tracker.csv", index=False)
+    print("\n=== EXPERIMENT TRACKER (SETELAH ITER 2) ===")
+    print(_df_tr2.to_string(index=False))
+    _df_tr2
+    return
+
+
+@app.cell
+def K21c_fold0_iter3(mo, run_fold0_experiment):
+    # Fase 2C (Iter 3): Uji Resolusi Tinggi (448x448 RGB, aug=basic) pada Fold 0,
+    # lalu pilih konfigurasi pemenang Stage 1 dan tampilkan grafik perbandingan Fold 0.
+    import gc as _gc
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import cv2 as _cv2
+    import numpy as _np
+    import pandas as _pd
+    import matplotlib as _mpl
+    _mpl.use("Agg")
+    import matplotlib.pyplot as _plt
+    import torch as _torch
+
+    _ART = _Path("/marimo/Fenomena")
+    _df_inv_c = _pd.read_parquet(_ART / "df_inventory.parquet")
+
+    def _load_cache_k21c(_sz=448):
+        def _one(_r):
+            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
+            return _a1, _a2
+        with _TPE(max_workers=16) as _ex:
+            _res = list(_ex.map(_one, _df_inv_c.to_dict("records")))
+        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
+        return _pre_t, _post_t
+
+    print("=== Iter 3: High-Resolution 448x448 RGB (aug=basic) ===", flush=True)
+    _pre_448, _post_448 = _load_cache_k21c(448)
+    _ll3, _rf3, _cf3, _dt3 = run_fold0_experiment("iter3_res448", _pre_448, _post_448, _aug_mode="basic", _epochs=15, _bs=48)
+    del _pre_448, _post_448
+    _gc.collect()
+    _torch.cuda.empty_cache()
+
+    _df_prev = _pd.read_csv(_ART / "experiment_tracker.csv")
+    _df_prev = _df_prev[_df_prev["iter"] != "Iter 3 (High-Res 448 RGB)"]
+    _keep_base_ll = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_logloss"].min())
+    _keep_base_cf = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_cal_f1"].max())
+    _keep3 = (_ll3 < _keep_base_ll) and (_cf3 > _keep_base_cf)
+
+    _row3 = _pd.DataFrame([{"iter": "Iter 3 (High-Res 448 RGB)", "res": 448, "lab_clahe": False, "aug": "basic", "f0_logloss": round(_ll3, 4), "f0_raw_f1": round(_rf3, 4), "f0_cal_f1": round(_cf3, 4), "decision": "KEEP" if _keep3 else "ROLLBACK", "sec": _dt3}])
+    _df_tr3 = _pd.concat([_df_prev, _row3], ignore_index=True)
+    _df_tr3.to_csv(_ART / "experiment_tracker.csv", index=False)
+
+    _winners = _df_tr3[_df_tr3["decision"].isin(["BASELINE", "KEEP"])]
+    _best_row = _winners.sort_values(["f0_logloss", "f0_cal_f1"], ascending=[True, False]).iloc[0]
+    print("\n=== EXPERIMENT TRACKER FINAL STAGE 1 ===")
+    print(_df_tr3.to_string(index=False))
+    print(f"\nPEMENANG STAGE 1 (Keep/Rollback): {_best_row['iter']} | res={_best_row['res']} | lab_clahe={_best_row['lab_clahe']} | aug={_best_row['aug']}")
+
+    _plt.close("all")
+    _fig, _axes = _plt.subplots(1, 2, figsize=(12, 4))
+    _axes[0].bar(_df_tr3["iter"], _df_tr3["f0_logloss"], color=["#2b6cb0" if d != "ROLLBACK" else "#a0aec0" for d in _df_tr3["decision"]])
+    _axes[0].set_title("Fold 0 Validation LogLoss (Lebih Rendah Lebih Baik)")
+    _axes[0].tick_params(axis="x", rotation=18)
+    _axes[0].set_ylim(1.0, max(_df_tr3["f0_logloss"].max() * 1.05, 1.25))
+
+    _axes[1].bar(_df_tr3["iter"], _df_tr3["f0_cal_f1"], color=["#2f855a" if d != "ROLLBACK" else "#a0aec0" for d in _df_tr3["decision"]])
+    _axes[1].set_title("Fold 0 OOS Calibrated Macro F1 (Lebih Tinggi Lebih Baik)")
+    _axes[1].tick_params(axis="x", rotation=18)
+    _axes[1].set_ylim(0.45, max(_df_tr3["f0_cal_f1"].max() * 1.1, 0.65))
+    _fig.tight_layout()
+    mo.status.toast(title="Stage 1 Selesai", description=f"Pemenang: {_best_row['iter']}")
+    _fig
     return
 
 

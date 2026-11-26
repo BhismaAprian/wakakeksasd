@@ -1,0 +1,4 @@
+iter,res,lab_clahe,aug,f0_logloss,f0_raw_f1,f0_cal_f1,decision,sec
+Iter 0 (Base 384 RGB),384,False,basic,1.1311,0.5868,0.5603,BASELINE,287.3
+Iter 1 (LAB CLAHE 384),384,True,basic,1.1381,0.6024,0.5999,ROLLBACK,287.0
+Iter 2 (D4+Cloud Aug 384),384,False,d4_full,1.1745,0.5756,0.5891,ROLLBACK,289.2

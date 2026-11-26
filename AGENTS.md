@@ -40,3 +40,9 @@ ATURAN PEMAKAIAN:
 - Untuk memilih arsitektur change detection, gunakan `computer-vision-expert` + `computer-vision-deep`.
 - Untuk menjaga protokol Macro F1 dan Stratified 5-Fold, patuhi `kaggle-grandmaster` + `agentic-kaggle-skill` + Bagian 2 AGENTS.md.
 - Jangan mengubah protokol validasi atau arsitektur inti (Siamese Network + EfficientNet-B4) tanpa persetujuan manusia.
+
+## 6. Keputusan Arsitektur Terkunci (Pasca-Audit Forensik)
+Berdasarkan Audit Forensik Matematis pada `3.180` pasangan citra (`reports/FORENSIC_AUDIT_REPORT.md` / `artifacts_synced/FORENSIC_AUDIT_REPORT.md`), disahkan oleh manusia:
+- **Symmetric Temporal-Swap Invariant Fusion:** Gabungkan `[0.5*(f_pre + f_post), max(f_pre, f_post), |f_post - f_pre|]` (dengan *Channel Attention* pada `|f_post - f_pre|`) agar model kebal terhadap inversi kronologis `pre ↔ post` (`33–45%` sampel).
+- **Random Temporal Swap (`p=0.5`)** saat training dan **Bidirectional Swap-TTA** (`0.5 * (P(pre, post) + P(post, pre))`) saat validasi & inferensi.
+- **Kunci Validasi:** Gunakan `artifacts_synced/folds_skf5.npy` (`StratifiedKFold(5, random_state=42)` pada `pseudo_labels_v2.parquet`) secara konsisten di seluruh eksperimen.
