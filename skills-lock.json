@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "skills": {
+    "agentic-kaggle-skill": {
+      "source": "FrankS-IntelLab/agentic-kaggle-skill",
+      "commit": "3cdd820356c80fbdd946138d2f86cbc2bd5e91b9",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "22f0b8df0a901707242446788f7de6a31abeaf31933dfae5b5812d8f34ae7a42"
+    },
+    "computer-vision-deep": {
+      "source": "omer-metin/skills-for-antigravity",
+      "commit": "e8dcf4e8737921a10088bd5c9eb65e81f74c051f",
+      "sourceType": "github",
+      "skillPath": "skills/computer-vision-deep/SKILL.md",
+      "computedHash": "5f9244a1b95061a16b8168d30ffabebf5a76af72c9fc8d5b9533b5466fb80dcd"
+    },
+    "computer-vision-expert": {
+      "source": "ranbot-ai/awesome-skills",
+      "commit": "b9f98eadee92da758ed3bf3a7a8be1bfc680c9f6",
+      "sourceType": "github",
+      "skillPath": "skills/computer-vision-expert/SKILL.md",
+      "computedHash": "657691f3f34cbdf2d6123cc2862015e70e87fdb853e8987f2393ea27a83372e4"
+    },
+    "geospatial-analysis": {
+      "source": "itallstartedwithaidea/agent-skills",
+      "commit": "7a04ccbde5f96d4bfe99a15a7e6fd96a7a0d4cd6",
+      "sourceType": "github",
+      "skillPath": "skills/scientific-research/geospatial-analysis/SKILL.md",
+      "computedHash": "8637e30301e55256e40b5fa90a8d8fba5a3ca29458f0e06c9a793b44b4976662"
+    },
+    "kaggle-grandmaster": {
+      "source": "OlixIgnacious/agent-skills",
+      "commit": "22fbe427944150b0df2395536834c54e265eba6c",
+      "sourceType": "github",
+      "skillPath": "skills/kaggle-grandmaster/SKILL.md",
+      "computedHash": "0df82e632a38c55324f730931be353572fd7f08f8ac9740939f9d5716dc90fba"
+    },
+    "marimo-pair": {
+      "source": "marimo-team/marimo-pair",
+      "commit": "2dfdaf9514e075b86d143856576b4676b7130b14",
+      "sourceType": "github",
+      "skillPath": "skills/marimo-pair/SKILL.md",
+      "computedHash": "207305c4b5c2b736200f60e57d0dede43c1785a577264c467d590559543d9a45"
+    },
+    "opencv": {
+      "source": "tondevrel/scientific-agent-skills",
+      "commit": "6e89d9e8c84188050bd50c420e48b639be484bb9",
+      "sourceType": "github",
+      "skillPath": "skills/opencv/SKILL.md",
+      "computedHash": "fd1e5cb1f950008446eb59e074a9ef5428511584f8984fdef2f2f14dfc25f393"
+    },
+    "retro-marimo-pair": {
+      "source": "marimo-team/marimo-pair",
+      "commit": "2dfdaf9514e075b86d143856576b4676b7130b14",
+      "sourceType": "github",
+      "skillPath": "skills/retro-marimo-pair/SKILL.md",
+      "computedHash": "e3cf49351a42f71bc054b8cfbdcf06ae1ded5bf89d70bab49b81229e4cd7654e"
+    },
+    "rioxarray-remote-sensing": {
+      "source": "xjtulyc/awesome-rosetta-skills",
+      "commit": "6cffda43d7cd6c07c563e2f2e24a88a615bcf003",
+      "sourceType": "github",
+      "skillPath": "skills/04-earth-science/rioxarray-remote-sensing/SKILL.md",
+      "computedHash": "54a096f5e67a23d3ef2834e1fc0d298e47d681f290334d8f1fd5dc263c8860f0"
+    },
+    "space-data-processing": {
+      "source": "omer-metin/skills-for-antigravity",
+      "commit": "e8dcf4e8737921a10088bd5c9eb65e81f74c051f",
+      "sourceType": "github",
+      "skillPath": "skills/space-data-processing/SKILL.md",
+      "computedHash": "c8d3349569444e178532b6c58bc0c94498c8314f860f07708269da789e4dd988"
+    }
+  }
+}

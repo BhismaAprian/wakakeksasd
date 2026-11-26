@@ -1,0 +1,22 @@
+# Local agent skills & cache
+.agents/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# Large model checkpoints, embeddings, datasets, and credentials
+*.pth
+*.pt
+*.npy
+*.npz
+*.parquet
+*.zip
+*.jpg
+*.jpeg
+*.png
+.env
+*.token
+*.jsonl

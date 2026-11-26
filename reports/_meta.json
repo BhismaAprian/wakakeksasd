@@ -1,0 +1,34 @@
+{
+  "n_ids": 3180,
+  "n_valid_clean": 3180,
+  "n_integrity_issues": 0,
+  "ada_label": false,
+  "distribusi_kelas": null,
+  "mean_ssim": 0.169375,
+  "median_ssim": 0.145588,
+  "ssim_bimodal": false,
+  "mean_mae_rgb": {
+    "mae_r": 55.6145,
+    "mae_g": 52.4041,
+    "mae_b": 51.3219
+  },
+  "unregistered_ratio": 0.7633,
+  "registered_median_translation_px": 874.2,
+  "kl_divergence_mean": {
+    "kl_r": 1.8788,
+    "kl_g": 2.0091,
+    "kl_b": 2.0577
+  },
+  "gpu_device": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "gpu_vram_gb": 101.98,
+  "rekomendasi_arsitektur": "Zero-shot VLM/CLIP (SigLIP / OpenCLIP ViT-L/H + VLM Qwen2-VL/InternVL untuk pseudo-label terkalibrasi) -> Student Siamese Network (EfficientNet-B4/ConvNeXt) dengan pseudo-label berkeyakinan tinggi",
+  "artefak": {
+    "inventory": "/marimo/Fenomena/df_inventory.parquet",
+    "change": "/marimo/Fenomena/df_change.parquet",
+    "registration": "/marimo/Fenomena/df_registration.parquet",
+    "color_stats": "/marimo/Fenomena/color_stats.parquet",
+    "sample_grid": "/marimo/Fenomena/sample_grid.png",
+    "meta": "/marimo/Fenomena/_meta.json",
+    "exp_summary": "/marimo/Fenomena/EXP_SUMMARY.md"
+  }
+}
