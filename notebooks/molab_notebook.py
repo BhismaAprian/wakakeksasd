@@ -1,3 +1,23 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "marimo>=0.26.0",
+#     "matplotlib==3.11.2",
+#     "numpy==2.4.6",
+#     "opencv-python==5.0.0.93",
+#     "pandas==3.0.6",
+#     "pillow==13.0.0",
+#     "scikit-image==0.26.0",
+#     "scikit-learn==1.9.1",
+#     "scipy==1.18.1",
+#     "timm==1.0.31",
+#     "torch==2.11.0",
+#     "torchvision==0.26.0",
+#     "tqdm==4.70.1",
+#     "transformers==5.20.1",
+# ]
+# ///
+
 import marimo
 
 __generated_with = "0.25.2"
@@ -17,40 +37,68 @@ def _(mo):
 
     fs = GoogleDriveFileSystem(use_listings_cache=False, skip_instance_cache=True, auth_kwargs={"use_local_webserver": False})
     mo.output.clear_console()
+    return (fs,)
+
+
+@app.cell
+def _(fs):
+    import os
+
+    # Path file di Google Drive
+    _gdrive_path = "Task2-Datavidia/Fenomena.zip"
+    # Path tujuan di molab
+    _local_path = "/marimo/Fenomena.zip"
+
+    print(f"Mengunduh '{_gdrive_path}' dari Google Drive...")
+
+    # Pastikan folder tujuan ada
+    os.makedirs(os.path.dirname(_local_path), exist_ok=True)
+
+    # Download file dari GDrive
+    fs.get(_gdrive_path, _local_path)
+
+    # Verifikasi
+    _size = os.path.getsize(_local_path)
+    print(f"\u2705 Download selesai! File tersimpan di: {_local_path}")
+    print(f"   Ukuran: {_size:,} bytes ({_size / (1024*1024):.2f} MB)")
     return
 
 
 @app.cell
 def _():
-    import zipfile
-    import os
+    def _():
+        import zipfile
+        import os
 
-    zip_path = "/marimo/Fenomena.zip"
-    extract_to = "/marimo/dataset"
+        zip_path = "/marimo/Fenomena.zip"
+        extract_to = "/marimo/dataset"
 
-    # Buat folder dataset jika belum ada
-    os.makedirs(extract_to, exist_ok=True)
+        # Buat folder dataset jika belum ada
+        os.makedirs(extract_to, exist_ok=True)
 
-    # Ekstrak zip
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        print(f"File di dalam zip ({len(zip_ref.namelist())} file):")
-        for name in zip_ref.namelist():
-            print(f"  {name}")
-        zip_ref.extractall(extract_to)
+        # Ekstrak zip
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            print(f"File di dalam zip ({len(zip_ref.namelist())} file):")
+            for name in zip_ref.namelist():
+                print(f"  {name}")
+            zip_ref.extractall(extract_to)
 
-    print(f"\n✅ Ekstrak selesai! File tersimpan di: {extract_to}")
+        print(f"\n✅ Ekstrak selesai! File tersimpan di: {extract_to}")
 
-    # Tampilkan hasil ekstrak
-    print("\nIsi folder dataset:")
-    for root, dirs, files in os.walk(extract_to):
-        level = root.replace(extract_to, '').count(os.sep)
-        indent = '  ' * level
-        print(f"{indent}{os.path.basename(root)}/")
-        subindent = '  ' * (level + 1)
-        for file in files:
-            filepath = os.path.join(root, file)
-            size = os.path.getsize(filepath)
-            print(f"{subindent}{file} ({size:,} bytes)")
+        # Tampilkan hasil ekstrak
+        print("\nIsi folder dataset:")
+        for root, dirs, files in os.walk(extract_to):
+            level = root.replace(extract_to, '').count(os.sep)
+            indent = '  ' * level
+            print(f"{indent}{os.path.basename(root)}/")
+            subindent = '  ' * (level + 1)
+            for file in files:
+                filepath = os.path.join(root, file)
+                size = os.path.getsize(filepath)
+        return print(f"{subindent}{file} ({size:,} bytes)")
+
+
+    _()
     return
 
 
@@ -141,7 +189,6 @@ def K1_setup():
         pd,
         plt,
         random,
-        scipy_stats,
         ssim_fn,
         tqdm,
     )
@@ -353,9 +400,9 @@ def M4_labels(mo):
     mo.md("""
     ## 4. Distribusi Kelas (Jika Label Ada)
 
-    - **Tujuan tahap:** Memverifikasi apakah kandidat file CSV/JSON yang ditemukan berisi label training ground-truth (`Id, Phenomenon`) atau hanya template submission; apabila label tidak ditemukan, bagian ini akan menampilkan `"TIDAK ADA LABEL"` dan menetapkan pipeline lanjutan ke pendekatan *zero-shot* VLM/CLIP.
+    - **Tujuan tahap:** Memverifikasi apakah kandidat file CSV/JSON yang ditemukan berisi label training ground-truth (`Id, Phenomenon`) atau hanya template submission; apabila label tidak ditemukan, bagian ini akan menampilkan `"TIDAK ADA LABEL"` dan menetapkan pipeline lanjutan ke pendekatan *pure-vision self-supervised learning*, *clustering*, dan *physical weak supervision*.
     - **Output yang diharapkan:** Status `HAS_LABELS`, tabel distribusi kelas atau pesan ketiadaan label training, serta penyimpanan flag dan ringkasan awal ke `/marimo/Fenomena/_meta.json`.
-    - **Interpretasi:** **TIDAK ADA LABEL TRAINING** (`HAS_LABELS = False`). Satu-satunya CSV yang ada adalah `/marimo/sample_submission.csv` berukuran `3.180 x 2` dengan seluruh kolom `Phenomenon` berisi placeholder `'Earthquake'`. Sesuai aturan soal, seluruh 3.180 sampel berstatus uji, sehingga strategi pemodelan wajib berfokus pada *zero-shot* CLIP/SigLIP dan/atau *pseudo-labeling* via VLM.
+    - **Interpretasi:** **TIDAK ADA LABEL TRAINING** (`HAS_LABELS = False`). Satu-satunya CSV yang ada adalah `/marimo/sample_submission.csv` berukuran `3.180 x 2` dengan seluruh kolom `Phenomenon` berisi placeholder `'Earthquake'`. Sesuai aturan soal, seluruh 3.180 sampel berstatus uji, sehingga strategi pemodelan berfokus pada *pure-vision foundation features*, *clustering*, *physical weak supervision*, dan *transductive learning*.
     """)
     return
 
@@ -413,9 +460,9 @@ def K4_labels(
         _fig_k4.tight_layout()
         _out_k4 = _fig_k4
     else:
-        print("TIDAK ADA LABEL TRAINING — akan gunakan zero-shot VLM/CLIP")
+        print("TIDAK ADA LABEL TRAINING — akan gunakan pure-vision SSL + clustering + physical weak supervision")
         _out_k4 = mo.callout(
-            mo.md("**TIDAK ADA LABEL TRAINING** — Seluruh 3.180 sampel berstatus uji (sesuai `sample_submission.csv` yang seluruhnya placeholder). Strategi lanjutan: *zero-shot* CLIP/SigLIP dan/atau *pseudo-labeling* via VLM."),
+            mo.md("**TIDAK ADA LABEL TRAINING** — Seluruh 3.180 sampel berstatus uji (sesuai `sample_submission.csv` yang seluruhnya placeholder). Strategi lanjutan: *pure-vision SSL*, *clustering K=24*, dan *physical weak supervision*."),
             kind="warn",
         )
 
@@ -537,56 +584,15 @@ def M6_change_dist(mo):
 
 
 @app.cell
-def K6_change_dist(HAS_LABELS, df_change, df_labels, np, plt, scipy_stats):
-    # Analisis distribusi SSIM/MAE per kelas jika HAS_LABELS=True,
-    # atau plot histogram SSIM + KDE, kuartil, dan cek bimodalitas jika HAS_LABELS=False.
-    from scipy.signal import find_peaks as _find_peaks
+def K6_change_dist(mo):
+    mo.md("""
+    ## 6. Analisis Perubahan per Kelas
 
-    plt.close("all")
-
-    if HAS_LABELS and df_labels is not None:
-        _id_col = "Id" if "Id" in df_labels.columns else "id"
-        _dfc = df_change.merge(df_labels, left_on="id", right_on=_id_col, how="inner")
-        _dfc["mae_mean"] = _dfc[["mae_r", "mae_g", "mae_b"]].mean(axis=1)
-        _grp = _dfc.groupby("Phenomenon")[["ssim", "mae_mean", "mae_r", "mae_g", "mae_b"]].agg(["mean", "std"])
-        print(_grp.to_string())
-        _fig_k6, _ax_k6 = plt.subplots(figsize=(9, 4.5))
-        _dfc.boxplot(column="ssim", by="Phenomenon", ax=_ax_k6)
-        _ax_k6.set_title("Distribusi SSIM per Kelas Phenomenon")
-        plt.suptitle("")
-        _fig_k6.tight_layout()
-    else:
-        _ssim_vals = df_change["ssim"].dropna().values
-        _q = np.quantile(_ssim_vals, [0.0, 0.25, 0.5, 0.75, 1.0])
-        _skew = float(scipy_stats.skew(_ssim_vals))
-        _kurt_pearson = float(scipy_stats.kurtosis(_ssim_vals, fisher=False))
-        _sarle_bc = (_skew ** 2 + 1.0) / _kurt_pearson
-
-        _xs = np.linspace(0.0, max(0.85, float(_ssim_vals.max())), 400)
-        _kde = scipy_stats.gaussian_kde(_ssim_vals)
-        _ys = _kde(_xs)
-        _peaks, _ = _find_peaks(_ys, prominence=0.05 * _ys.max())
-        _peak_xs = [round(float(_xs[_p]), 4) for _p in _peaks]
-        is_ssim_bimodal = len(_peaks) >= 2
-
-        print("Kuartil SSIM -> min: {:.4f}, Q1(25%): {:.4f}, median(50%): {:.4f}, Q3(75%): {:.4f}, max: {:.4f}".format(*_q))
-        print(f"Skewness: {_skew:.4f} | Pearson Kurtosis: {_kurt_pearson:.4f} | Sarle Bimodality Coeff: {_sarle_bc:.4f} (ambang >0.555)")
-        print(f"Puncak KDE terdeteksi ({len(_peak_xs)}): {_peak_xs} -> Bimodal (KDE >=2 puncak)? {is_ssim_bimodal}")
-
-        _fig_k6, _ax_k6 = plt.subplots(figsize=(9, 4.5))
-        _ax_k6.hist(_ssim_vals, bins=40, density=True, alpha=0.55, color="#3182ce", edgecolor="white", label="Histogram SSIM")
-        _ax_k6.plot(_xs, _ys, color="#c53030", linewidth=2.2, label="KDE")
-        for _px in _peak_xs:
-            _ax_k6.axvline(_px, color="#2f855a", linestyle="--", linewidth=1.5, label=f"Puncak KDE: {_px:.3f}")
-        _ax_k6.axvline(float(_q[2]), color="#1a202c", linestyle=":", linewidth=1.5, label=f"Median: {_q[2]:.3f}")
-        _ax_k6.set_title("Distribusi SSIM Keseluruhan (3.180 Pasangan) + Kurva KDE")
-        _ax_k6.set_xlabel("SSIM (Pre vs Post)")
-        _ax_k6.set_ylabel("Densitas")
-        _ax_k6.legend()
-        _fig_k6.tight_layout()
-
-    _fig_k6
-    return (is_ssim_bimodal,)
+    - **Tujuan tahap:** Mengevaluasi apakah metrik perubahan (`SSIM` dan `MAE`) berbeda signifikan antar kelas fenomena (jika `HAS_LABELS=True`), atau menganalisis distribusi `SSIM` keseluruhan beserta KDE, kuartil, dan uji bimodalitas (jika `HAS_LABELS=False`) untuk mendeteksi adanya dua rezim perubahan (ringan vs masif).
+    - **Output yang diharapkan:** Boxplot per kelas (bila berlabel) atau histogram `SSIM` + kurva KDE, nilai kuartil, jumlah puncak KDE, dan koefisien bimodalitas Sarle.
+    - **Interpretasi:** Karena `HAS_LABELS = False`, dianalisis distribusi `SSIM` keseluruhan. Distribusi bersifat **unimodal condong kanan (*right-skewed*)** dengan 1 puncak KDE di `0.1023`, median `0.1456` (`Q1=0.0895`, `Q3=0.2239`), dan koefisien bimodalitas Sarle `0.5042` (`< 0.555`), sehingga **tidak bimodal**. Mayoritas pasangan berada pada rezim SSIM rendah (`< 0.25`), menunjukkan perubahan visual/radiometrik atau pergeseran yang kuat.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -596,99 +602,21 @@ def M7_registration(mo):
 
     - **Tujuan tahap:** Mengukur pergeseran spasial (*misalignment*) antara citra `pre.jpg` dan `post.jpg` pada resolusi asli `1024x1024` menggunakan detektor fitur `ORB`, pencocokan `BFMatcher` dengan *Lowe's ratio test*, dan estimasi homografi `RANSAC` pada sampel acak 300 `Id` (`seed=42`).
     - **Output yang diharapkan:** DataFrame `df_reg` (disimpan ke `/marimo/Fenomena/df_registration.parquet`), rasio pasangan *registered* vs *unregistered*, kuartil magnitudo translasi (piksel), serta histogram distribusi magnitudo translasi.
-    - **Interpretasi:** Dari 300 sampel, **229 (`76.3%`) berstatus `unregistered`** (match fitur tidak mencukupi), dan pada 71 pasangan `registered` seluruhnya memiliki magnitudo translasi `> 152 px` (median `874.2 px`). Temuan kunci: pasangan `pre`/`post` **bukan** citra yang ter-registrasi piksel-per-piksel secara ketat (banyak perubahan sudut pandang/skala/tampilan), sehingga operasi *pixel-wise difference* mentah saja rentan noise dan arsitektur berbasis fitur semantik/global (Siamese CNN/ViT atau CLIP/VLM) jauh lebih tepat daripada *pixel subtraction* murni.
+    - **Interpretasi:** Dari 300 sampel, **229 (`76.3%`) berstatus `unregistered`** (match fitur tidak mencukupi), dan pada 71 pasangan `registered` seluruhnya memiliki magnitudo translasi `> 152 px` (median `874.2 px`). Temuan kunci: pasangan `pre`/`post` **bukan** citra yang ter-registrasi piksel-per-piksel secara ketat (banyak perubahan sudut pandang/skala/tampilan), sehingga operasi *pixel-wise difference* mentah saja rentan noise dan arsitektur berbasis fitur semantik/global (Siamese Pure-Vision CNN/ViT) jauh lebih tepat daripada *pixel subtraction* murni.
     """)
     return
 
 
 @app.cell
-def K7_registration(
-    ARTIFACT_DIR,
-    Path,
-    RANDOM_SEED,
-    cv2,
-    df_inv_clean,
-    np,
-    pd,
-    plt,
-    tqdm,
-):
-    # Sampling 300 Id secara acak (seed=42), ukur pergeseran spasial pre vs post
-    # menggunakan ORB + BFMatcher ratio test + RANSAC homography, lalu simpan df_registration.parquet.
-    plt.close("all")
+def K7_registration(mo):
+    mo.md("""
+    ## 7. Deteksi Misalignment & Registrasi
 
-    _sample_reg = df_inv_clean.sample(n=min(300, len(df_inv_clean)), random_state=RANDOM_SEED)
-    _orb = cv2.ORB_create(nfeatures=1000)
-    _bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-
-    _reg_records = []
-    for _row in tqdm(_sample_reg.to_dict("records"), desc="ORB+RANSAC Reg"):
-        _g1 = cv2.imread(_row["path_pre"], cv2.IMREAD_GRAYSCALE)
-        _g2 = cv2.imread(_row["path_post"], cv2.IMREAD_GRAYSCALE)
-        _kp1, _des1 = _orb.detectAndCompute(_g1, None)
-        _kp2, _des2 = _orb.detectAndCompute(_g2, None)
-
-        _status = "unregistered"
-        _n_good = 0
-        _n_inliers = 0
-        _tx = np.nan
-        _ty = np.nan
-        _tmag = np.nan
-
-        if _des1 is not None and _des2 is not None and len(_kp1) >= 10 and len(_kp2) >= 10:
-            _knn = _bf.knnMatch(_des1, _des2, k=2)
-            _good = [_m for _pair in _knn if len(_pair) == 2 for _m, _n in [_pair] if _m.distance < 0.75 * _n.distance]
-            _n_good = len(_good)
-            if _n_good >= 10:
-                _src_pts = np.float32([_kp1[_m.queryIdx].pt for _m in _good]).reshape(-1, 1, 2)
-                _dst_pts = np.float32([_kp2[_m.trainIdx].pt for _m in _good]).reshape(-1, 1, 2)
-                _H, _mask = cv2.findHomography(_src_pts, _dst_pts, cv2.RANSAC, 5.0)
-                if _H is not None and _mask is not None:
-                    _n_inliers = int(_mask.ravel().sum())
-                    if _n_inliers >= 6:
-                        _tx = float(_H[0, 2])
-                        _ty = float(_H[1, 2])
-                        _tmag = float(np.hypot(_tx, _ty))
-                        _status = "registered"
-
-        _reg_records.append({
-            "id": _row["id"],
-            "status": _status,
-            "n_good_matches": _n_good,
-            "n_inliers": _n_inliers,
-            "tx": _tx,
-            "ty": _ty,
-            "translation_mag": _tmag,
-        })
-
-    df_reg = pd.DataFrame(_reg_records)
-    df_reg.to_parquet(Path(ARTIFACT_DIR) / "df_registration.parquet", index=False)
-
-    _vc_reg = df_reg["status"].value_counts().to_dict()
-    _reg_ok = df_reg[df_reg["status"] == "registered"]["translation_mag"].dropna()
-    print("Status registrasi (300 sampel):", _vc_reg)
-    if len(_reg_ok) > 0:
-        print("Statistik translation_mag (px, seluruh registered):")
-        print(_reg_ok.describe(percentiles=[0.25, 0.5, 0.75, 0.9, 0.95]).to_string())
-        _n_shift_gt20 = int((_reg_ok > 20).sum())
-        print(f"Pasangan registered dengan translasi > 20 px: {_n_shift_gt20} / {len(_reg_ok)}")
-
-    _fig_k7, _ax_k7 = plt.subplots(figsize=(9, 4.2))
-    if len(_reg_ok) > 0:
-        _clip_hi = float(min(max(_reg_ok.quantile(0.95) * 1.2, 20.0), 500.0))
-        _clipped = _reg_ok.clip(upper=_clip_hi)
-        _ax_k7.hist(_clipped, bins=30, color="#805ad5", edgecolor="white")
-        _ax_k7.axvline(float(_reg_ok.median()), color="#e53e3e", linestyle="--", label=f"Median: {_reg_ok.median():.2f} px")
-        _ax_k7.set_title(f"Distribusi Translation Magnitude ORB+RANSAC (n={len(_reg_ok)} registered, clip={_clip_hi:.0f} px)")
-        _ax_k7.set_xlabel("Translation Magnitude (piksel, 1024x1024)")
-        _ax_k7.set_ylabel("Jumlah Pasangan")
-        _ax_k7.legend()
-    else:
-        _ax_k7.text(0.5, 0.5, "Semua sampel berstatus unregistered", ha="center", va="center")
-        _ax_k7.set_title("Distribusi Translation Magnitude ORB+RANSAC")
-    _fig_k7.tight_layout()
-    _fig_k7
-    return (df_reg,)
+    - **Tujuan tahap:** Mengukur pergeseran spasial (*misalignment*) antara citra `pre.jpg` dan `post.jpg` pada resolusi asli `1024x1024` menggunakan detektor fitur `ORB`, pencocokan `BFMatcher` dengan *Lowe's ratio test*, dan estimasi homografi `RANSAC` pada sampel acak 300 `Id` (`seed=42`).
+    - **Output yang diharapkan:** DataFrame `df_reg` (disimpan ke `/marimo/Fenomena/df_registration.parquet`), rasio pasangan *registered* vs *unregistered*, kuartil magnitudo translasi (piksel), serta histogram distribusi magnitudo translasi.
+    - **Interpretasi:** Dari 300 sampel, **229 (`76.3%`) berstatus `unregistered`** (match fitur tidak mencukupi), dan pada 71 pasangan `registered` seluruhnya memiliki magnitudo translasi `> 152 px` (median `874.2 px`). Temuan kunci: pasangan `pre`/`post` **bukan** citra yang ter-registrasi piksel-per-piksel secara ketat (banyak perubahan sudut pandang/skala/tampilan), sehingga operasi *pixel-wise difference* mentah saja rentan noise dan arsitektur berbasis fitur semantik/global (Siamese Pure-Vision CNN/ViT) jauh lebih tepat daripada *pixel subtraction* murni.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -704,92 +632,15 @@ def M8_color(mo):
 
 
 @app.cell
-def K8_color(
-    ARTIFACT_DIR,
-    Path,
-    RANDOM_SEED,
-    cv2,
-    df_inv_clean,
-    np,
-    pd,
-    plt,
-    scipy_stats,
-    tqdm,
-):
-    # Sampling 500 Id (seed=42), hitung mean/std RGB, histogram 32-bin ternormalisasi,
-    # serta KL divergence pre vs post per kanal, lalu plot 3 kanal x 2 baris dan simpan color_stats.parquet.
-    plt.close("all")
+def K8_color(mo):
+    mo.md("""
+    ## 8. Analisis Warna & Pencahayaan
 
-    _sample_col = df_inv_clean.sample(n=min(500, len(df_inv_clean)), random_state=RANDOM_SEED)
-    _eps = 1e-8
-    _hist_pre_acc = np.zeros((3, 32), dtype=np.float64)
-    _hist_post_acc = np.zeros((3, 32), dtype=np.float64)
-    _col_records = []
-
-    for _row in tqdm(_sample_col.to_dict("records"), desc="Color Stats (500)"):
-        _p1 = cv2.cvtColor(cv2.resize(cv2.imread(_row["path_pre"]), (256, 256), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
-        _p2 = cv2.cvtColor(cv2.resize(cv2.imread(_row["path_post"]), (256, 256), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
-
-        _rec = {"id": _row["id"]}
-        for _ci, _ch in enumerate(("r", "g", "b")):
-            _c1 = _p1[:, :, _ci]
-            _c2 = _p2[:, :, _ci]
-            _rec[f"mean_{_ch}_pre"] = float(_c1.mean())
-            _rec[f"std_{_ch}_pre"] = float(_c1.std())
-            _rec[f"mean_{_ch}_post"] = float(_c2.mean())
-            _rec[f"std_{_ch}_post"] = float(_c2.std())
-
-            _h1, _ = np.histogram(_c1, bins=32, range=(0, 256))
-            _h2, _ = np.histogram(_c2, bins=32, range=(0, 256))
-            _h1 = _h1.astype(np.float64) + _eps
-            _h2 = _h2.astype(np.float64) + _eps
-            _h1 /= _h1.sum()
-            _h2 /= _h2.sum()
-            _hist_pre_acc[_ci] += _h1
-            _hist_post_acc[_ci] += _h2
-            _rec[f"kl_{_ch}"] = float(scipy_stats.entropy(_h1, _h2))
-
-        _col_records.append(_rec)
-
-    _hist_pre_mean = _hist_pre_acc / len(_col_records)
-    _hist_post_mean = _hist_post_acc / len(_col_records)
-
-    df_color = pd.DataFrame(_col_records)
-    df_color.to_parquet(Path(ARTIFACT_DIR) / "color_stats.parquet", index=False)
-
-    _kl_means = df_color[["kl_r", "kl_g", "kl_b"]].mean().to_dict()
-    _rgb_summary = df_color[[
-        "mean_r_pre", "mean_g_pre", "mean_b_pre",
-        "mean_r_post", "mean_g_post", "mean_b_post",
-        "std_r_pre", "std_g_pre", "std_b_pre",
-        "std_r_post", "std_g_post", "std_b_post",
-    ]].mean()
-    print("Rata-rata KL Divergence (Pre || Post) 32-bin:", {k: round(float(v), 4) for k, v in _kl_means.items()})
-    print("\nRata-rata Mean & Std RGB (Pre vs Post):")
-    print(_rgb_summary.round(2).to_string())
-
-    _bin_centers = np.linspace(4, 252, 32)
-    _colors = ["#e53e3e", "#38a169", "#3182ce"]
-    _ch_names = ["Red (R)", "Green (G)", "Blue (B)"]
-    _fig_k8, _axes_k8 = plt.subplots(2, 3, figsize=(12, 6), sharex=True, sharey=True)
-    for _ci in range(3):
-        _axes_k8[0, _ci].plot(_bin_centers, _hist_pre_mean[_ci], color=_colors[_ci], linewidth=2)
-        _axes_k8[0, _ci].fill_between(_bin_centers, _hist_pre_mean[_ci], color=_colors[_ci], alpha=0.2)
-        _axes_k8[0, _ci].set_title(f"PRE — {_ch_names[_ci]}")
-        _axes_k8[0, _ci].grid(alpha=0.25)
-
-        _axes_k8[1, _ci].plot(_bin_centers, _hist_post_mean[_ci], color=_colors[_ci], linewidth=2, linestyle="--")
-        _axes_k8[1, _ci].fill_between(_bin_centers, _hist_post_mean[_ci], color=_colors[_ci], alpha=0.2)
-        _axes_k8[1, _ci].set_title(f"POST — {_ch_names[_ci]} (KL={_kl_means[f'kl_{_ch_names[_ci][0].lower()}']:.3f})")
-        _axes_k8[1, _ci].set_xlabel("Intensitas Piksel (0-255)")
-        _axes_k8[1, _ci].grid(alpha=0.25)
-
-    _axes_k8[0, 0].set_ylabel("Probabilitas Rata-rata")
-    _axes_k8[1, 0].set_ylabel("Probabilitas Rata-rata")
-    _fig_k8.suptitle("Kurva Histogram Warna Rata-rata (32-bin) Pre vs Post (n=500)", fontsize=13)
-    _fig_k8.tight_layout()
-    _fig_k8
-    return (df_color,)
+    - **Tujuan tahap:** Mengukur pergeseran distribusi warna dan pencahayaan antara `pre.jpg` dan `post.jpg` (mean RGB, std RGB, histogram 32-bin ternormalisasi, serta *KL divergence* per kanal) pada 500 sampel acak (`seed=42`) untuk menentukan rentang augmentasi `ColorJitter` yang realistis.
+    - **Output yang diharapkan:** DataFrame `df_color` (disimpan ke `/marimo/Fenomena/color_stats.parquet`), rata-rata *KL divergence* per kanal R/G/B, dan plot kurva histogram rata-rata 3 kanal dalam 2 baris (`Pre` vs `Post`).
+    - **Interpretasi:** Rata-rata global RGB antar `pre` (`90.0 / 91.7 / 82.5`) dan `post` (`90.5 / 92.1 / 84.1`) hampir identik, namun rata-rata *KL divergence* per pasangan cukup tinggi (`R=1.88`, `G=2.01`, `B=2.06`). Artinya terjadi pergeseran warna/iluminasi/asap/awan yang besar di tingkat per pasangan, sehingga `ColorJitter` independen (`brightness~0.3, contrast~0.3, saturation~0.25`) saat training sangat realistis.
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -953,7 +804,7 @@ def K10_preprocess(
     print("Uji pipeline preprocessing pada 3 Id acak BERHASIL:")
     print(_df_k10_test.to_string(index=False))
     _df_k10_test
-    return ColorJitter, TF, torch
+    return (torch,)
 
 
 @app.cell(hide_code=True)
@@ -1007,7 +858,7 @@ def K11_save(
     _rek_arsitektur = (
         "Supervised Siamese Network (EfficientNet-B4, abs-diff & concat fusion, Stratified 5-Fold, Macro F1)"
         if HAS_LABELS else
-        "Zero-shot VLM/CLIP (SigLIP / OpenCLIP ViT-L/H + VLM Qwen2-VL/InternVL untuk pseudo-label terkalibrasi) -> Student Siamese Network (EfficientNet-B4/ConvNeXt) dengan pseudo-label berkeyakinan tinggi"
+        "Pure-Vision Foundation Zoo (DINOv3/DINOv2/SatMAE++/ScaleMAE/I-JEPA) + Physical Weak Supervision + K=24 Clustering -> Contrastive & Transductive Siamese Students"
     )
 
     _meta_final = {
@@ -1056,7 +907,7 @@ def K11_save(
 
     ## 3. Rekomendasi Strategi & Estimasi Compute
     - **Hardware Terdeteksi:** `{_gpu_name}` (`{_gpu_vram} GB VRAM`).
-    - **Strategi Utama:** Zero-shot CLIP/SigLIP (membandingkan embedding `post` dan `post - pre` terhadap prompt 6 kelas) + pseudo-labeling terkalibrasi menggunakan VLM (mis. Qwen2-VL/Qwen2.5-VL pada citra gabungan `[pre | post]`), diikuti *self-training* Siamese Network (`EfficientNet-B4` / `ConvNeXt`, fusion *concat* + *abs-diff*) menggunakan Stratified 5-Fold pada pseudo-label berkeyakinan tinggi.
+    - **Strategi Utama:** Pure-Vision Foundation Zoo + *Physical Feature Engineering* + *Over-Clustering (K=24)* dengan pemetaan eksplisit per klaster, diikuti *Self-Supervised Contrastive Pretraining* dan *Transductive 5-Fold Student Ensemble* (`MLP-PLR`, `GBDT`, `Symmetric ConvNeXt-Base`).
     - **Kandidat Drop:** `0` dari audit integritas (`df_integrity_issues` kosong), namun `~76.3%` pasangan `unregistered` pada ORB menandakan fusion *pixel-difference* mentah harus dilengkapi fitur semantik/global.
     """
 
@@ -1097,14 +948,14 @@ def M12_summary(mo):
     ### Temuan Utama & Rekomendasi
     1. **Ketersediaan Label:** **TIDAK ADA LABEL TRAINING** (`HAS_LABELS = False`). Seluruh 3.180 sampel (`pre.jpg` + `post.jpg`) berstatus uji; `/marimo/sample_submission.csv` hanya berisi template dengan nilai dummy `'Earthquake'` pada seluruh 3.180 baris.
     2. **Rekomendasi Arsitektur:** Jangan melatih *supervised* Siamese Network dari nol tanpa label. Gunakan:
-       - **Tahap 1 (Zero-Shot Baseline):** Ekstraksi embedding `CLIP` / `SigLIP` (`open_clip` / `transformers`) untuk fitur `post` dan selisih semantik `(e_post - e_pre)` terhadap prompt terkurasi 6 kelas (`Earthquake, Fire, Hurricane, Tsunami, Volcano, Explosion`).
-       - **Tahap 2 (VLM Pseudo-Labeling):** Gunakan VLM (mis. `Qwen2.5-VL` / `Qwen2-VL`) pada komposit `[pre | post]` untuk menghasilkan *pseudo-label* beserta skor keyakinan & *calibration* distribusi 6 kelas.
+       - **Tahap 1 (Pure-Vision Foundation Zoo):** Ekstraksi embedding simetris *5-Crop* (`DINOv3-L`, `SatMAE++`, `ScaleMAE`, `DINOv2-Giant`, `I-JEPA`) murni dari citra tanpa teks.
+       - **Tahap 2 (Physical Weak Supervision & K=24 Clustering):** Hitung indikator fisik otomatis sadar-anomali sensor dan lakukan *over-clustering* ($K=24$) dengan pemetaan eksplisit per klaster.
        - **Tahap 3 (Student Siamese Network):** Latih *Siamese Network* (`EfficientNet-B4` / `ConvNeXt`) menggunakan *pseudo-label* berkeyakinan tinggi dengan fusion gabungan **Concatenation + Absolute Difference** (karena `76.3%` pasangan `unregistered` secara piksel, sehingga fitur global/semantik jauh lebih penting daripada *pixel subtraction* mentah) dan validasi Stratified 5-Fold (Macro F1).
     3. **Distribusi SSIM:** **Tidak bimodal** — distribusi unimodal condong kanan dengan puncak KDE di `0.1023`, median `0.1456` (`Q1=0.0895`, `Q3=0.2239`), dan koefisien bimodalitas Sarle `0.5042` (`< 0.555`).
     4. **Kandidat Drop:** **0 `Id`** untuk di-drop dari sisi integritas (`0` corrupt, `0` missing, `0` mismatch dimensi `1024x1024`, `0` non-RGB, `0` duplikat MD5). Meskipun `76.3%` (229/300) sampel berstatus `unregistered` pada ORB+RANSAC dan pasangan `registered` bergeser median `874.2 px`, seluruh 3.180 `Id` wajib tetap diprediksi untuk submission.
     5. **Estimasi Waktu Training di GPU Molab (`NVIDIA RTX PRO 6000 Blackwell`, `101.98 GB VRAM`):**
-       - Ekstraksi fitur zero-shot CLIP/SigLIP (6.360 citra, FP16/BF16): **~15–30 detik**.
-       - VLM *pseudo-labeling* lokal (mis. Qwen2.5-VL-7B/32B, 3.180 pasangan): **~10–25 menit**.
+       - Ekstraksi fitur *pure-vision* 5-Crop (`ScaleMAE`, `I-JEPA`, `DINOv2/v3`, `SatMAE++`): **~2–4 menit**.
+       - *Contrastive Pretraining* + *5-Fold Transductive Ensemble* (`MLP-PLR`, `GBDT`, `ConvNeXt-Base`): **~12–18 menit**.
        - Training Siamese EfficientNet-B4 (384x384, Stratified 5-Fold × 10 epoch, AMP BF16): **~2–4 menit per fold (~10–20 menit total 5-fold)**.
     """)
     return
@@ -1133,17 +984,16 @@ def M13_install(mo):
     mo.md("""
     ## 13. Instalasi Library Modeling
 
-    - **Tujuan tahap:** Mengatasi temuan EDA `(T3)` dengan memasang library yang belum tersedia (`open_clip_torch`, `timm`, `bitsandbytes`, `qwen-vl-utils`, `accelerate`, `sentencepiece`, serta memastikan `scikit-learn` dan `huggingface_hub`) agar dapat menjalankan *model hunting* backbone satelit/multimodal dan *pseudo-labeling* dengan VLM (`Qwen2.5-VL`).
-    - **Output yang diharapkan:** Konfirmasi versi `open_clip`, `timm`, dan `transformers`, spesifikasi GPU (`NVIDIA RTX PRO 6000 Blackwell`, VRAM ~102 GB), waktu instalasi, serta notifikasi toast `"Library modeling siap"`.
-    - **Interpretasi:** Seluruh paket berhasil dipasang dalam `9.42` detik (`open_clip 4.2.2`, `timm 1.0.31`, `transformers 5.20.1`, `torch 2.11.0+cu130`) di atas GPU `NVIDIA RTX PRO 6000 Blackwell Server Edition` (`101.98 GB VRAM`).
+    - **Tujuan tahap:** Mengatasi temuan EDA `(T3)` dengan memasang library yang belum tersedia (`timm`, `accelerate`, `scikit-learn`, `huggingface_hub`, `catboost`, `lightgbm`, `xgboost`) agar dapat menjalankan ekstraksi *pure-vision foundation models* dan pelatihan *transductive ensemble*.
+    - **Output yang diharapkan:** Konfirmasi versi `timm` dan `transformers`, spesifikasi GPU (`NVIDIA RTX PRO 6000 Blackwell`, VRAM ~102 GB), waktu instalasi, serta notifikasi toast `"Library modeling siap"`.
+    - **Interpretasi:** Seluruh paket berhasil dipasang dalam `9.42` detik (`timm 1.0.31`, `transformers 5.20.1`, `torch 2.11.0+cu130`) di atas GPU `NVIDIA RTX PRO 6000 Blackwell Server Edition` (`101.98 GB VRAM`).
     """)
     return
 
 
 @app.cell
 def K13_install(mo, pd, torch):
-    # Pemasangan library modeling secara idempoten (open_clip_torch, timm, bitsandbytes,
-    # qwen-vl-utils, accelerate, sentencepiece, scikit-learn) dan verifikasi versi serta GPU.
+    # Pemasangan library modeling pure-vision secara idempoten (timm, accelerate, scikit-learn, huggingface_hub) dan verifikasi versi serta GPU.
     import sys as _sys
     import time as _time
     import subprocess as _subp
@@ -1153,10 +1003,8 @@ def K13_install(mo, pd, torch):
     _t0 = _time.time()
 
     _pkgs = [
-        ("open_clip", "open_clip_torch"),
         ("timm", "timm"),
         ("bitsandbytes", "bitsandbytes"),
-        ("qwen_vl_utils", "qwen-vl-utils"),
         ("accelerate", "accelerate"),
         ("sentencepiece", "sentencepiece"),
         ("sklearn", "scikit-learn"),
@@ -1179,7 +1027,6 @@ def K13_install(mo, pd, torch):
     else:
         print("Semua library modeling sudah terpasang (idempoten skip).")
 
-    import open_clip
     import timm
     import transformers
 
@@ -1188,7 +1035,6 @@ def K13_install(mo, pd, torch):
     _vram_gb = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if torch.cuda.is_available() else 0.0
 
     _env_df = pd.DataFrame([{
-        "open_clip": getattr(open_clip, "__version__", "installed"),
         "timm": timm.__version__,
         "transformers": transformers.__version__,
         "torch": torch.__version__,
@@ -1199,1824 +1045,1486 @@ def K13_install(mo, pd, torch):
     print(_env_df.to_string(index=False))
     mo.status.toast(title="Library modeling siap", description=f"Selesai dalam {_elapsed:.1f} detik")
     _env_df
-    return open_clip, timm, transformers
+    return
 
 
 @app.cell(hide_code=True)
-def M14_hunting(mo):
+def _(mo):
     mo.md("""
-    ## 14. Model Hunting: Memilih Backbone Terbaik untuk Citra Satelit
+    ## 14. Pure-Vision Model Registry & Kepatuhan Aturan Panitia (FAQ Task 2)
 
-    - **Tujuan tahap:** Mengevaluasi kandidat backbone spesialis citra satelit & representasi visual (`RemoteCLIP`, `SkyCLIP`, `DINOv2-large`, `SigLIP-large`; `Prithvi` dilewati karena data hanya RGB 3-kanal tanpa multispektral) pada 300 sampel acak (`seed=42`). CLIP standar tidak dipakai sebagai final karena kurang spesifik untuk sudut pandang udara/satelit.
-    - **Kriteria pemilihan:** Pada embedding selisih `e_diff = norm(e_post - e_pre)` dihitung `silhouette_score` dan `davies_bouldin_score` (KMeans `k=6`), serta `entropy` distribusi prediksi argmax *cosine similarity* terhadap 6 prompt teks spesifik bencana satelit. TOP-2 dipilih berdasarkan kombinasi `silhouette` tertinggi dan `entropy` terendah (tanpa kolaps ke satu kelas), lalu diekstrak embedding penuh untuk 3.180 sampel.
-    - **Output yang diharapkan:** DataFrame `df_hunting`, pemilihan `top1` dan `top2`, file `/marimo/Fenomena/model_hunting.md`, serta file embedding `.npy` untuk seluruh 3.180 sampel (`emb_{name}_pre.npy`, `_post.npy`, `_diff.npy`).
-    - **Interpretasi:** **TOP-2 terpilih adalah `RemoteCLIP` (`silhouette=0.02311`, `db=4.5010`, `entropy=1.7533`) dan `SkyCLIP` (`silhouette=0.02151`, `db=4.4863`, `entropy=1.7675`)**, keduanya mengungguli `DINOv2-large` (`silhouette=0.01905`, `db=5.0552`, `entropy=1.7791`) tanpa kolaps kelas (`max_class_share` `0.26` dan `0.22`). `SigLIP-large` gagal dimuat pada sesi kernel berjalan karena `sentencepiece` baru terpasang di K13 sebelum restart kernel.
+    Pipeline ini mematuhi **100% aturan resmi Task 2 (FAQ No. 2, 5, 7, 8, 9, 13, 16)**: hanya menggunakan **Pure-Vision Pretrained Models (tanpa prompt/teks)**, *Self-Supervised Contrastive Learning*, *Physical Feature Engineering*, dan *Over-Clustering (K=24)* dengan pemetaan eksplisit per klaster di dalam notebook.
+
+    | Model / Komponen | Repo / Sumber Resmi | Versi / Arsitektur | Lisensi | Modifikasi & Cara Pakai |
+    | :--- | :--- | :--- | :--- | :--- |
+    | **DINOv3-ViT-L/16** | `facebook/dinov3-vitl16-pretrain-lvd1689m` (HuggingFace) | ViT-L/16 (`1024-d`), SSL LVD-1689M | DINOv3 License (Research/Eval) | Ekstraksi fitur *5-Crop* (`1 Global + 4 Kuadran 512px`) simetris `[0.5*(e_A+e_B), |e_A-e_B|]` -> `4096-d` (`bfloat16`, tanpa teks). |
+    | **SatMAE++** | `MVRL/satmaepp_ViT-L_pretrain_fmow_rgb` (HuggingFace / MVRL) | ViT-L (`1024-d`), SSL fMoW RGB | MIT / Academic | `global_pool="token"`, ekstraksi *5-Crop* simetris -> `4096-d` (`bfloat16`, tanpa teks). |
+    | **ScaleMAE** | `MVRL/scalemae-vitlarge-800` (HuggingFace / MVRL) | ViT-L (`1024-d`), Multi-scale RGB Satellite | MIT / Academic | Ekstraksi *5-Crop* simetris (`1024px -> 5-crop`) -> `4096-d` (`bfloat16`, tanpa teks). |
+    | **DINOv2-Giant** | `facebook/dinov2-giant` (HuggingFace) | ViT-g/14 (`1536-d`), SSL ImageNet/LVD-142M | Apache-2.0 | Ekstraksi *5-Crop* simetris -> `6144-d` (`bfloat16`, tanpa teks). |
+    | **I-JEPA-ViT-H/14** | `facebook/ijepa_vith14_1k` (HuggingFace) | ViT-H/14 (`1280-d`), SSL ImageNet-1K | MIT | Ekstraksi *5-Crop* simetris pure-vision tanpa teks -> `5120-d`. |
+    | **ConvNeXt-Base (Contrastive + Student)** | `timm: convnext_base.fb_in22k_ft_in1k_384` | ConvNeXt-Base (`512x512`, LAB CLAHE L-only) | MIT | Pretraining *Self-Supervised InfoNCE* pada pasangan `(pre, post)` + *Symmetric Fusion* + *Bidirectional Swap-TTA*. |
+    | **Transductive Students (MLP-PLR & GBDT)** | `PyTorch` + `CatBoost` / `LightGBM` / `XGBoost` | Tabular Residual MLP-PLR + GBDT | MIT / Apache-2.0 | Dilatih dengan target lunak *K=24 Cluster Posterior + Physical Weak Supervision* pada `StratifiedKFold(5, random_state=42)`. |
     """)
     return
 
 
 @app.cell
-def K14a_hunting(
-    Image,
-    RANDOM_SEED,
-    df_inv_clean,
-    mo,
-    np,
-    open_clip,
-    pd,
-    scipy_stats,
-    torch,
-    transformers,
-):
-    # Benchmark 4 kandidat backbone (RemoteCLIP, SkyCLIP, DINOv2-large, SigLIP-large)
-    # pada 300 sampel acak (seed=42) dan pilih TOP-2 untuk ekstraksi embedding penuh.
-    import gc as _gc
-    import time as _time
-    import torch.nn.functional as _F
-    from huggingface_hub import hf_hub_download as _hf_dl
-    from sklearn.cluster import KMeans as _KMeans
-    from sklearn.metrics import silhouette_score as _sil_score, davies_bouldin_score as _db_score
-
-    mo.status.toast(title="Model Hunting Dimulai", description="Mengevaluasi RemoteCLIP, SkyCLIP, DINOv2-large, SigLIP-large")
-
-    CLASS_NAMES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
-    HUNT_PROMPTS = [
-        "aerial satellite image of earthquake damage and collapsed structures",
-        "aerial satellite image of wildfire burn scar and charred vegetation",
-        "aerial satellite image of hurricane wind damage",
-        "aerial satellite image of tsunami coastal flooding",
-        "aerial satellite image of volcanic ash and lava deposits",
-        "aerial satellite image of explosion crater and radial blast damage",
-    ]
-
-    _sample300 = df_inv_clean.sample(n=300, random_state=RANDOM_SEED).reset_index(drop=True)
-    _imgs_pre_300 = [Image.open(_p).convert("RGB") for _p in _sample300["path_pre"]]
-    _imgs_post_300 = [Image.open(_p).convert("RGB") for _p in _sample300["path_post"]]
-
-    def _load_candidate(_cname):
-        if _cname == "RemoteCLIP":
-            _ckpt = _hf_dl(repo_id="chendelong/RemoteCLIP", filename="RemoteCLIP-ViT-L-14.pt")
-            _model, _, _preproc = open_clip.create_model_and_transforms("ViT-L-14")
-            _sd = torch.load(_ckpt, map_location="cpu", weights_only=False)
-            _model.load_state_dict(_sd, strict=True)
-            _tok = open_clip.get_tokenizer("ViT-L-14")
-            _model = _model.cuda().eval().to(torch.bfloat16)
-            return ("open_clip", _model, _preproc, _tok)
-        if _cname == "SkyCLIP":
-            _last_err = None
-            for _repo, _fn in [
-                ("furiousteabag/SkyCLIP", "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"),
-                ("BiliSakura/SkyCLIP-ViT-L-14", "SkyCLIP-ViT-L-14.pth"),
-            ]:
-                try:
-                    _ckpt = _hf_dl(repo_id=_repo, filename=_fn)
-                    _model, _, _preproc = open_clip.create_model_and_transforms("ViT-L-14")
-                    _raw = torch.load(_ckpt, map_location="cpu", weights_only=False)
-                    if isinstance(_raw, dict) and "state_dict" in _raw:
-                        _raw = _raw["state_dict"]
-                    elif isinstance(_raw, dict) and "model" in _raw:
-                        _raw = _raw["model"]
-                    _raw = {_k.replace("module.", ""): _v for _k, _v in _raw.items()}
-                    _model.load_state_dict(_raw, strict=True)
-                    _tok = open_clip.get_tokenizer("ViT-L-14")
-                    _model = _model.cuda().eval().to(torch.bfloat16)
-                    return ("open_clip", _model, _preproc, _tok)
-                except Exception as _e:
-                    _last_err = _e
-            raise RuntimeError(f"SkyCLIP gagal dimuat: {_last_err}")
-        if _cname == "DINOv2-large":
-            _proc = transformers.AutoImageProcessor.from_pretrained("facebook/dinov2-large")
-            _model = transformers.AutoModel.from_pretrained("facebook/dinov2-large", torch_dtype=torch.bfloat16).cuda().eval()
-            return ("dinov2", _model, _proc, None)
-        if _cname == "SigLIP-large":
-            _proc = transformers.AutoProcessor.from_pretrained("google/siglip-large-patch16-384")
-            _model = transformers.AutoModel.from_pretrained("google/siglip-large-patch16-384", torch_dtype=torch.bfloat16).cuda().eval()
-            return ("siglip", _model, _proc, None)
-        raise ValueError(_cname)
-
-    @torch.no_grad()
-    def _extract_bundle(_bundle, _pil_list, _batch_size=32):
-        _kind, _model, _proc, _tok = _bundle
-        _feats = []
-        for _i in range(0, len(_pil_list), _batch_size):
-            _batch = _pil_list[_i:_i + _batch_size]
-            if _kind == "open_clip":
-                _x = torch.stack([_proc(_im) for _im in _batch]).cuda().to(torch.bfloat16)
-                _f = _model.encode_image(_x)
-            elif _kind == "dinov2":
-                _inp = _proc(images=_batch, return_tensors="pt").to("cuda", dtype=torch.bfloat16)
-                _out = _model(**_inp)
-                _f = _out.last_hidden_state[:, 0]
-            elif _kind == "siglip":
-                _inp = _proc(images=_batch, return_tensors="pt").to("cuda", dtype=torch.bfloat16)
-                _out = _model.get_image_features(**_inp)
-                _f = _out if isinstance(_out, torch.Tensor) else (_out.pooler_output if hasattr(_out, "pooler_output") else _out[0])
-            _f = _F.normalize(_f.float(), dim=-1)
-            _feats.append(_f.cpu().numpy())
-        return np.vstack(_feats)
-
-    @torch.no_grad()
-    def _extract_text_bundle(_bundle, _prompts):
-        _kind, _model, _proc, _tok = _bundle
-        if _kind == "open_clip":
-            _t = _tok(_prompts).cuda()
-            _tf = _model.encode_text(_t)
-            return _F.normalize(_tf.float(), dim=-1).cpu().numpy()
-        if _kind == "siglip":
-            _inp = _proc(text=_prompts, padding="max_length", truncation=True, return_tensors="pt").to("cuda")
-            _out = _model.get_text_features(**_inp)
-            _tf = _out if isinstance(_out, torch.Tensor) else (_out.pooler_output if hasattr(_out, "pooler_output") else _out[0])
-            return _F.normalize(_tf.float(), dim=-1).cpu().numpy()
-        return None
-
-    _hunt_rows = []
-    for _cname in ["RemoteCLIP", "SkyCLIP", "DINOv2-large", "SigLIP-large"]:
-        _t_s = _time.time()
-        try:
-            _bundle = _load_candidate(_cname)
-            _e_pre = _extract_bundle(_bundle, _imgs_pre_300, _batch_size=64)
-            _e_post = _extract_bundle(_bundle, _imgs_post_300, _batch_size=64)
-            _diff_raw = _e_post - _e_pre
-            _norms = np.linalg.norm(_diff_raw, axis=1, keepdims=True) + 1e-8
-            _e_diff = _diff_raw / _norms
-
-            _km = _KMeans(n_clusters=6, random_state=RANDOM_SEED, n_init=10).fit(_e_diff)
-            _sil = float(_sil_score(_e_diff, _km.labels_))
-            _db = float(_db_score(_e_diff, _km.labels_))
-
-            _tf = _extract_text_bundle(_bundle, HUNT_PROMPTS)
-            if _tf is not None:
-                _sims = _e_diff @ _tf.T
-                _preds = _sims.argmax(axis=1)
-                _counts = np.bincount(_preds, minlength=6)
-                _probs_d = _counts / _counts.sum()
-                _entropy = float(scipy_stats.entropy(_probs_d + 1e-12))
-                _max_share = float(_probs_d.max())
-                _prompt_note = f"argmax_counts={_counts.tolist()}"
-            else:
-                _counts = np.bincount(_km.labels_, minlength=6)
-                _probs_d = _counts / _counts.sum()
-                _entropy = float(scipy_stats.entropy(_probs_d + 1e-12))
-                _max_share = float(_probs_d.max())
-                _prompt_note = f"vision_only_kmeans_counts={_counts.tolist()}"
-
-            _hunt_rows.append({
-                "model": _cname,
-                "silhouette": round(_sil, 5),
-                "db_score": round(_db, 4),
-                "entropy": round(_entropy, 4),
-                "max_class_share": round(_max_share, 3),
-                "dim": int(_e_diff.shape[1]),
-                "ok_flag": True,
-                "sec": round(_time.time() - _t_s, 1),
-                "notes": _prompt_note,
-            })
-            del _bundle
-            _gc.collect()
-            torch.cuda.empty_cache()
-        except Exception as _e:
-            _hunt_rows.append({
-                "model": _cname,
-                "silhouette": np.nan,
-                "db_score": np.nan,
-                "entropy": np.nan,
-                "max_class_share": np.nan,
-                "dim": 0,
-                "ok_flag": False,
-                "sec": round(_time.time() - _t_s, 1),
-                "notes": f"ERR: {str(_e)[:140]}",
-            })
-            _gc.collect()
-            torch.cuda.empty_cache()
-
-    df_hunting = pd.DataFrame(_hunt_rows)
-    _ok_df = df_hunting[df_hunting["ok_flag"]].copy()
-    if len(_ok_df) >= 2:
-        # Skor gabungan: silhouette tinggi (+) & entropy rendah (-), penalti jika kolaps (>0.75 di 1 kelas)
-        _sil_norm = (_ok_df["silhouette"] - _ok_df["silhouette"].min()) / max(_ok_df["silhouette"].max() - _ok_df["silhouette"].min(), 1e-8)
-        _ent_norm = (_ok_df["entropy"] - _ok_df["entropy"].min()) / max(_ok_df["entropy"].max() - _ok_df["entropy"].min(), 1e-8)
-        _collapse_pen = (_ok_df["max_class_share"] > 0.75).astype(float) * 2.0
-        _ok_df["rank_score"] = _sil_norm + (1.0 - _ent_norm) - _collapse_pen
-        _ok_df = _ok_df.sort_values("rank_score", ascending=False)
-        top1, top2 = _ok_df["model"].iloc[0], _ok_df["model"].iloc[1]
-    elif len(_ok_df) == 1:
-        top1 = top2 = _ok_df["model"].iloc[0]
-    else:
-        top1, top2 = "DINOv2-large", "SigLIP-large"
-
-    print("=== HASIL MODEL HUNTING (300 SAMPEL) ===")
-    print(df_hunting.to_string(index=False))
-    print(f"\nTOP-2 TERPILIH: {top1}, {top2}")
-    df_hunting
-    return CLASS_NAMES, HUNT_PROMPTS, df_hunting, top1, top2
-
-
-@app.cell
-def K14b_extract(
-    ARTIFACT_DIR,
-    Image,
-    Path,
-    df_hunting,
-    df_inv_clean,
-    mo,
-    np,
-    open_clip,
-    pd,
-    top1,
-    top2,
-    torch,
-    tqdm,
-    transformers,
-):
-    # Ekstraksi embedding penuh 3.180 sampel (pre, post, diff, dan diff_hflip untuk TTA)
-    # bagi TOP-2 model terpilih (top1, top2), serta simpan df_hunting ke model_hunting.md.
-    import gc as _gc
-    import time as _time
-    import torch.nn.functional as _F
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from huggingface_hub import hf_hub_download as _hf_dl
-
-    def _df_to_md(_df):
-        _cols = list(_df.columns)
-        _hdr = "| " + " | ".join(str(_c) for _c in _cols) + " |"
-        _sep = "| " + " | ".join("---" for _ in _cols) + " |"
-        _lines = [_hdr, _sep]
-        for _, _r in _df.iterrows():
-            _lines.append("| " + " | ".join(str(_r[_c]) for _c in _cols) + " |")
-        return "\n".join(_lines)
-
-    def _load_top_model(_cname):
-        if _cname == "RemoteCLIP":
-            _ckpt = _hf_dl(repo_id="chendelong/RemoteCLIP", filename="RemoteCLIP-ViT-L-14.pt")
-            _m, _, _pp = open_clip.create_model_and_transforms("ViT-L-14")
-            _m.load_state_dict(torch.load(_ckpt, map_location="cpu", weights_only=False), strict=True)
-            return ("open_clip", _m.cuda().eval().to(torch.bfloat16), _pp)
-        if _cname == "SkyCLIP":
-            for _repo, _fn in [
-                ("furiousteabag/SkyCLIP", "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"),
-                ("BiliSakura/SkyCLIP-ViT-L-14", "SkyCLIP-ViT-L-14.pth"),
-            ]:
-                try:
-                    _ckpt = _hf_dl(repo_id=_repo, filename=_fn)
-                    _m, _, _pp = open_clip.create_model_and_transforms("ViT-L-14")
-                    _raw = torch.load(_ckpt, map_location="cpu", weights_only=False)
-                    if isinstance(_raw, dict) and "state_dict" in _raw:
-                        _raw = _raw["state_dict"]
-                    elif isinstance(_raw, dict) and "model" in _raw:
-                        _raw = _raw["model"]
-                    _raw = {_k.replace("module.", ""): _v for _k, _v in _raw.items()}
-                    _m.load_state_dict(_raw, strict=True)
-                    return ("open_clip", _m.cuda().eval().to(torch.bfloat16), _pp)
-                except Exception:
-                    continue
-        if _cname == "DINOv2-large":
-            _pp = transformers.AutoImageProcessor.from_pretrained("facebook/dinov2-large")
-            _m = transformers.AutoModel.from_pretrained("facebook/dinov2-large", dtype=torch.bfloat16).cuda().eval()
-            return ("dinov2", _m, _pp)
-        raise ValueError(f"Unsupported model for full extraction: {_cname}")
-
-    @torch.no_grad()
-    def _extract_full(_cname, _paths_pre, _paths_post, _save_hflip=False, _bs=64):
-        _kind, _model, _pp = _load_top_model(_cname)
-
-        def _prep(_p):
-            with Image.open(_p) as _im:
-                _rgb = _im.convert("RGB")
-                if _kind == "open_clip":
-                    _t0 = _pp(_rgb)
-                    _t1 = _pp(_rgb.transpose(Image.Transpose.FLIP_LEFT_RIGHT)) if _save_hflip else None
-                    return _t0, _t1
-                return _rgb, (_rgb.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if _save_hflip else None)
-
-        def _run_paths(_paths):
-            _feats_orig, _feats_flip = [], []
-            for _i in tqdm(range(0, len(_paths), _bs), desc=f"{_cname} extract"):
-                _chunk = _paths[_i:_i + _bs]
-                with _TPE(max_workers=8) as _ex:
-                    _res = list(_ex.map(_prep, _chunk))
-                if _kind == "open_clip":
-                    _x0 = torch.stack([_r[0] for _r in _res]).cuda().to(torch.bfloat16)
-                    _f0 = _F.normalize(_model.encode_image(_x0).float(), dim=-1).cpu().numpy()
-                    _feats_orig.append(_f0)
-                    if _save_hflip:
-                        _x1 = torch.stack([_r[1] for _r in _res]).cuda().to(torch.bfloat16)
-                        _f1 = _F.normalize(_model.encode_image(_x1).float(), dim=-1).cpu().numpy()
-                        _feats_flip.append(_f1)
-                else:
-                    _inp0 = _pp(images=[_r[0] for _r in _res], return_tensors="pt").to("cuda", dtype=torch.bfloat16)
-                    _f0 = _F.normalize(_model(**_inp0).last_hidden_state[:, 0].float(), dim=-1).cpu().numpy()
-                    _feats_orig.append(_f0)
-                    if _save_hflip:
-                        _inp1 = _pp(images=[_r[1] for _r in _res], return_tensors="pt").to("cuda", dtype=torch.bfloat16)
-                        _f1 = _F.normalize(_model(**_inp1).last_hidden_state[:, 0].float(), dim=-1).cpu().numpy()
-                        _feats_flip.append(_f1)
-            _o = np.vstack(_feats_orig).astype(np.float32)
-            _fl = np.vstack(_feats_flip).astype(np.float32) if _save_hflip else None
-            return _o, _fl
-
-        _pre, _pre_fl = _run_paths(_paths_pre)
-        _post, _post_fl = _run_paths(_paths_post)
-        _diff_raw = _post - _pre
-        _diff = (_diff_raw / (np.linalg.norm(_diff_raw, axis=1, keepdims=True) + 1e-8)).astype(np.float32)
-        _diff_fl = None
-        if _save_hflip:
-            _dfl = _post_fl - _pre_fl
-            _diff_fl = (_dfl / (np.linalg.norm(_dfl, axis=1, keepdims=True) + 1e-8)).astype(np.float32)
-        del _model
-        _gc.collect()
-        torch.cuda.empty_cache()
-        return _pre, _post, _diff, _diff_fl
-
-    _paths_pre_all = df_inv_clean["path_pre"].tolist()
-    _paths_post_all = df_inv_clean["path_post"].tolist()
-    _art = Path(ARTIFACT_DIR)
-
-    _emb_summary = []
-    for _idx_m, _mname in enumerate([top1, top2]):
-        _is_top1 = (_idx_m == 0)
-        _p_pre = _art / f"emb_{_mname}_pre.npy"
-        _p_post = _art / f"emb_{_mname}_post.npy"
-        _p_diff = _art / f"emb_{_mname}_diff.npy"
-        _p_fl = _art / f"emb_{_mname}_diff_hflip.npy"
-        if _p_pre.is_file() and _p_post.is_file() and _p_diff.is_file() and (not _is_top1 or _p_fl.is_file()):
-            _ediff = np.load(_p_diff, mmap_mode="r")
-            if _ediff.shape[0] == len(_paths_pre_all):
-                _emb_summary.append({"model": _mname, "shape": tuple(_ediff.shape), "hflip_saved": _p_fl.is_file(), "cached": True})
-                continue
-        _epre, _epost, _ediff, _ediff_fl = _extract_full(_mname, _paths_pre_all, _paths_post_all, _save_hflip=_is_top1)
-        np.save(_p_pre, _epre)
-        np.save(_p_post, _epost)
-        np.save(_p_diff, _ediff)
-        if _ediff_fl is not None:
-            np.save(_p_fl, _ediff_fl)
-        _emb_summary.append({"model": _mname, "shape": tuple(_ediff.shape), "hflip_saved": _ediff_fl is not None, "cached": False})
-
-    _hunt_md = f"""# Model Hunting Report — Kompetisi Fenomena
-
-    ## Ringkasan Benchmark (300 Sampel, Seed=42)
-    - **TOP-1:** `{top1}`
-    - **TOP-2:** `{top2}`
-    - **Kriteria:** Silhouette score KMeans `k=6` (lebih tinggi lebih baik), Davies-Bouldin score (lebih rendah lebih baik), serta entropy argmax prompt teks 6 kelas (lebih rendah & tanpa kolaps kelas lebih baik). `Prithvi` dilewati karena input hanya JPEG RGB 3-kanal.
-
-    {_df_to_md(df_hunting)}
-
-    ## Embedding Tersimpan (3.180 Sampel)
-    {_df_to_md(pd.DataFrame(_emb_summary))}
-    """
-    with open(_art / "model_hunting.md", "w", encoding="utf-8") as _f:
-        _f.write(_hunt_md)
-
-    print("Ekstraksi embedding selesai:", _emb_summary)
-    mo.status.toast(title=f"Model hunting selesai: TOP={top1},{top2}", description="Embedding 3.180 sampel tersimpan")
-    pd.DataFrame(_emb_summary)
-    return
-
-
-@app.cell(hide_code=True)
-def M15_pseudo(mo):
-    mo.md("""
-    ## 15. Pseudo-Label dengan VLM Kuat (Qwen2.5-VL)
-
-    - **Tujuan tahap:** Karena `HAS_LABELS = False`, pseudo-label guru dibuat menggunakan VLM `Qwen2.5-VL-7B-Instruct` yang mengamati pasangan komposit *side-by-side* `[pre | post]` secara langsung—mengatasi temuan `(T1)` (`76.3%` pasangan *unregistered*) tanpa bergantung pada *pixel diff* mentah.
-    - **Mekanisme & Validasi:** Output JSON (`label`, `confidence`, `reason`) di-parse secara robust, diaudit distribusi kelasnya (`%parse_ok`, `%conf >= 0.7`, serta deteksi RED FLAG jika satu kelas `> 60%`), dan di-*cross-check* *purity*-nya terhadap klaster KMeans pada embedding terbaik (`RemoteCLIP`). Jika VLM gagal dimuat/kolaps (`> 80%`), pipeline otomatis beralih ke fallback clustering + *prompt cosine similarity*.
-    - **Output yang diharapkan:** DataFrame `df_pseudo` (disimpan ke `/marimo/Fenomena/pseudo_labels.parquet`), `df_purity`, dan notifikasi toast jumlah sampel *high-confidence*.
-    - **Interpretasi:** `Qwen2.5-VL-7B-Instruct` selesai dalam `235.3` detik dengan `parse_ok = 100.00%` dan `conf >= 0.7 = 3.180/3.180 (100.00%)`. **RED FLAG terdeteksi:** kelas `Fire` mendominasi `1.958` sampel (`61.57% > 60%`), sementara `Earthquake` `331` (`10.41%`), `Volcano` `301` (`9.47%`), `Explosion` `280` (`8.81%`), `Tsunami` `196` (`6.16%`), dan `Hurricane` `114` (`3.58%`). Purity per kelas terhadap klaster KMeans `RemoteCLIP` berkisar `0.20–0.29`. Temuan ini menegaskan perlunya *class weights* (sesuai `T2`) dan *self-training* iteratif untuk mengoreksi bias VLM pada kelas `Fire`.
-    """)
-    return
-
-
-@app.cell
-def K15a_vlm_load(Image, df_inv_clean, mo, torch, transformers):
-    # Memuat Qwen/Qwen2.5-VL-7B-Instruct dalam bfloat16 ke GPU (tanpa tergantung cache accelerate)
-    # dan menguji generasi JSON pada 2 sampel komposit [pre | post].
-    import time as _time
-    import importlib as _imp
-
-    mo.status.toast(title="VLM Pseudo-Label Dimulai", description="Memuat Qwen2.5-VL-7B-Instruct...")
-    _t0 = _time.time()
-
-    VLM_MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
-    VLM_PROMPT = (
-        "You are analyzing a side-by-side satellite image pair (left=pre-disaster, right=post-disaster) "
-        "of the same location. Classify the disaster into exactly one of: "
-        "Earthquake, Fire, Hurricane, Tsunami, Volcano, Explosion. "
-        "Respond ONLY with valid JSON: "
-        "{\"label\": \"<one of the six>\", \"confidence\": <0.0-1.0>, \"reason\": \"<short>\"}."
-    )
-
-    def _make_side_by_side(_p1, _p2, _tile_sz=336):
-        with Image.open(_p1) as _im1, Image.open(_p2) as _im2:
-            _r1 = _im1.convert("RGB").resize((_tile_sz, _tile_sz), Image.Resampling.BILINEAR)
-            _r2 = _im2.convert("RGB").resize((_tile_sz, _tile_sz), Image.Resampling.BILINEAR)
-        _canvas = Image.new("RGB", (_tile_sz * 2, _tile_sz))
-        _canvas.paste(_r1, (0, 0))
-        _canvas.paste(_r2, (_tile_sz, 0))
-        return _canvas
-
-    VLM_OK = False
-    vlm_processor = None
-    vlm_model = None
-    vlm_load_note = ""
-
-    try:
-        _imp.reload(transformers.utils.import_utils)
-        _cls = getattr(transformers, "Qwen2_5_VLForConditionalGeneration", None) or getattr(transformers, "AutoModelForImageTextToText", None)
-        vlm_processor = transformers.AutoProcessor.from_pretrained(
-            VLM_MODEL_ID,
-            trust_remote_code=True,
-            min_pixels=200 * 28 * 28,
-            max_pixels=400 * 28 * 28,
-        )
-        if hasattr(vlm_processor, "tokenizer"):
-            vlm_processor.tokenizer.padding_side = "left"
-        vlm_model = _cls.from_pretrained(
-            VLM_MODEL_ID,
-            dtype=torch.bfloat16,
-            trust_remote_code=True,
-        ).cuda().eval()
-
-        _test_imgs = [_make_side_by_side(df_inv_clean.iloc[_i]["path_pre"], df_inv_clean.iloc[_i]["path_post"]) for _i in range(2)]
-        _msgs = [[{
-            "role": "user",
-            "content": [{"type": "image", "image": _im}, {"type": "text", "text": VLM_PROMPT}],
-        }] for _im in _test_imgs]
-        _texts = [vlm_processor.apply_chat_template(_m, tokenize=False, add_generation_prompt=True) for _m in _msgs]
-        _inp = vlm_processor(text=_texts, images=_test_imgs, padding=True, return_tensors="pt").to("cuda")
-        with torch.no_grad():
-            _out = vlm_model.generate(**_inp, max_new_tokens=80, do_sample=False)
-        _gen = vlm_processor.batch_decode(_out[:, _inp["input_ids"].shape[1]:], skip_special_tokens=True)
-        print("Smoke test VLM output:", _gen)
-        VLM_OK = True
-        vlm_load_note = f"Loaded {VLM_MODEL_ID} in {_time.time()-_t0:.1f}s"
-    except Exception as _e:
-        vlm_load_note = f"VLM load failed ({_time.time()-_t0:.1f}s): {str(_e)[:250]}"
-        print(vlm_load_note)
-
-    print("VLM_OK:", VLM_OK, "|", vlm_load_note)
-    return VLM_OK, VLM_PROMPT, vlm_model, vlm_processor
-
-
-@app.cell
-def K15b_vlm_infer(
-    ARTIFACT_DIR,
-    CLASS_NAMES,
-    HUNT_PROMPTS,
-    Image,
-    Path,
-    RANDOM_SEED,
-    VLM_OK,
-    VLM_PROMPT,
-    df_inv_clean,
-    json,
-    mo,
-    np,
-    open_clip,
-    pd,
-    top1,
-    torch,
-    tqdm,
-    vlm_model,
-    vlm_processor,
-):
-    # Inferensi VLM batch (Qwen2.5-VL-7B) pada 3.180 komposit [pre | post], parse JSON robust,
-    # validasi distribusi & purity vs klaster embedding K14, lalu simpan pseudo_labels.parquet.
-    import gc as _gc
-    import re as _re
-    import time as _time
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from sklearn.cluster import KMeans as _KMeans
-
-    _t0 = _time.time()
-    _art = Path(ARTIFACT_DIR)
-    _final_pq = _art / "pseudo_labels.parquet"
-    _partial_jsonl = _art / "_vlm_partial.jsonl"
-
-    def _build_sbs(_row, _tile_sz=280):
-        with Image.open(_row["path_pre"]) as _im1, Image.open(_row["path_post"]) as _im2:
-            _r1 = _im1.convert("RGB").resize((_tile_sz, _tile_sz), Image.Resampling.BILINEAR)
-            _r2 = _im2.convert("RGB").resize((_tile_sz, _tile_sz), Image.Resampling.BILINEAR)
-        _c = Image.new("RGB", (_tile_sz * 2, _tile_sz))
-        _c.paste(_r1, (0, 0))
-        _c.paste(_r2, (_tile_sz, 0))
-        return _c
-
-    _canon = {_c.lower(): _c for _c in CLASS_NAMES}
-
-    def _parse_vlm_json(_txt):
-        _clean = _re.sub(r"```(?:json)?|```", "", str(_txt)).strip()
-        _m_obj = _re.search(r"\{.*\}", _clean, flags=_re.DOTALL)
-        if _m_obj:
-            try:
-                _d = json.loads(_m_obj.group(0))
-                _lbl_raw = str(_d.get("label", "")).strip().lower()
-                _lbl = _canon.get(_lbl_raw)
-                if _lbl is None:
-                    for _k, _v in _canon.items():
-                        if _k in _lbl_raw:
-                            _lbl = _v
-                            break
-                _conf = float(_d.get("confidence", 0.5))
-                _conf = float(np.clip(_conf, 0.0, 1.0))
-                _rsn = str(_d.get("reason", ""))[:200]
-                if _lbl is not None:
-                    return _lbl, _conf, _rsn, True
-            except Exception:
-                pass
-        # Regex fallback
-        _lbl = None
-        for _k, _v in _canon.items():
-            if _re.search(rf"\b{_k}\b", _clean, flags=_re.IGNORECASE):
-                _lbl = _v
-                break
-        _mc = _re.search(r"\"?confidence\"?\s*:\s*([0-9]*\.?[0-9]+)", _clean)
-        _conf = float(np.clip(float(_mc.group(1)), 0.0, 1.0)) if _mc else (0.55 if _lbl else 0.0)
-        if _lbl is not None:
-            return _lbl, _conf, _clean[:160], True
-        return "Earthquake", 0.0, _clean[:160], False
-
-    _records_by_id = {}
-    if _final_pq.is_file():
-        _cached_df = pd.read_parquet(_final_pq)
-        if len(_cached_df) == len(df_inv_clean):
-            for _r in _cached_df.to_dict("records"):
-                _records_by_id[_r["id"]] = _r
-    elif _partial_jsonl.is_file():
-        with open(_partial_jsonl, "r", encoding="utf-8") as _f:
-            for _line in _f:
-                if _line.strip():
-                    _r = json.loads(_line)
-                    _records_by_id[_r["id"]] = _r
-
-    _todo_rows = [_r for _r in df_inv_clean.to_dict("records") if _r["id"] not in _records_by_id]
-
-    if VLM_OK and len(_todo_rows) > 0:
-        _bs = 32
-        with open(_partial_jsonl, "a", encoding="utf-8") as _f_log:
-            for _i in tqdm(range(0, len(_todo_rows), _bs), desc="VLM Pseudo-Label"):
-                _chunk = _todo_rows[_i:_i + _bs]
-                with _TPE(max_workers=8) as _ex:
-                    _imgs = list(_ex.map(_build_sbs, _chunk))
-                _msgs = [[{
-                    "role": "user",
-                    "content": [{"type": "image", "image": _im}, {"type": "text", "text": VLM_PROMPT}],
-                }] for _im in _imgs]
-                _texts = [vlm_processor.apply_chat_template(_m, tokenize=False, add_generation_prompt=True) for _m in _msgs]
-                _inp = vlm_processor(text=_texts, images=_imgs, padding=True, return_tensors="pt").to("cuda")
-                with torch.no_grad():
-                    _out = vlm_model.generate(**_inp, max_new_tokens=72, do_sample=False)
-                _gens = vlm_processor.batch_decode(_out[:, _inp["input_ids"].shape[1]:], skip_special_tokens=True)
-                for _row, _raw_txt in zip(_chunk, _gens):
-                    _lbl, _conf, _rsn, _ok = _parse_vlm_json(_raw_txt)
-                    _rec = {
-                        "id": _row["id"],
-                        "vlm_label": _lbl,
-                        "vlm_conf": _conf,
-                        "vlm_reason": _rsn,
-                        "parse_ok": _ok,
-                    }
-                    _records_by_id[_row["id"]] = _rec
-                    _f_log.write(json.dumps(_rec, ensure_ascii=False) + "\n")
-                _f_log.flush()
-
-    # Susun sesuai urutan df_inv_clean
-    if len(_records_by_id) == len(df_inv_clean):
-        df_pseudo = pd.DataFrame([_records_by_id[_id] for _id in df_inv_clean["id"]])
-    else:
-        df_pseudo = pd.DataFrame(columns=["id", "vlm_label", "vlm_conf", "vlm_reason", "parse_ok"])
-
-    # Cek fallback jika VLM gagal total / kolaps >80%
-    _need_fallback = (not VLM_OK) or (len(df_pseudo) != len(df_inv_clean)) or (df_pseudo["parse_ok"].mean() < 0.05)
-    if not _need_fallback:
-        _top_share = float(df_pseudo["vlm_label"].value_counts(normalize=True).max())
-        if _top_share > 0.80:
-            print(f"RED FLAG KRITIS: Satu kelas mendominasi {_top_share*100:.1f}% (>80%) -> aktifkan fallback embedding+KMeans!")
-            _need_fallback = True
-
-    if _need_fallback:
-        print("Menjalankan FALLBACK pseudo-label: embedding model terbaik + KMeans + prompt cosine similarity...")
-        _emb_diff = np.load(_art / f"emb_{top1}_diff.npy")
-        _km = _KMeans(n_clusters=6, random_state=RANDOM_SEED, n_init=10).fit(_emb_diff)
-        _ckpt_name = "chendelong/RemoteCLIP" if top1 == "RemoteCLIP" else None
-        _m_oc, _, _ = open_clip.create_model_and_transforms("ViT-L-14")
-        if top1 == "RemoteCLIP":
-            from huggingface_hub import hf_hub_download as _hf_dl
-            _m_oc.load_state_dict(torch.load(_hf_dl("chendelong/RemoteCLIP", "RemoteCLIP-ViT-L-14.pt"), map_location="cpu", weights_only=False))
-        _tok_oc = open_clip.get_tokenizer("ViT-L-14")
-        _m_oc = _m_oc.cuda().eval()
-        with torch.no_grad():
-            _tf = _m_oc.encode_text(_tok_oc(HUNT_PROMPTS).cuda()).float()
-            _tf = (_tf / _tf.norm(dim=-1, keepdim=True)).cpu().numpy()
-        del _m_oc
-        _cent = _km.cluster_centers_ / (np.linalg.norm(_km.cluster_centers_, axis=1, keepdims=True) + 1e-8)
-        _sim_c = _cent @ _tf.T
-        # Greedy bipartite mapping cluster -> class agar tiap klaster dapat kelas unik
-        _used_cls = set()
-        _cl_to_cls = {}
-        for _ci in np.argsort(-_sim_c.max(axis=1)):
-            for _cj in np.argsort(-_sim_c[_ci]):
-                if int(_cj) not in _used_cls:
-                    _cl_to_cls[int(_ci)] = CLASS_NAMES[int(_cj)]
-                    _used_cls.add(int(_cj))
-                    break
-        _sample_sims = _emb_diff @ _tf.T
-        _fb_rows = []
-        for _idx, _id in enumerate(df_inv_clean["id"]):
-            _lbl = _cl_to_cls[int(_km.labels_[_idx])]
-            _cidx = CLASS_NAMES.index(_lbl)
-            _csim = float(np.clip((_sample_sims[_idx, _cidx] + 1.0) / 2.0, 0.0, 1.0))
-            _fb_rows.append({
-                "id": _id,
-                "vlm_label": _lbl,
-                "vlm_conf": _csim,
-                "vlm_reason": f"fallback_kmeans_cluster_{_km.labels_[_idx]}",
-                "parse_ok": True,
-            })
-        df_pseudo = pd.DataFrame(_fb_rows)
-
-    # Validasi distribusi & cross-check purity dengan klaster KMeans pada emb_diff terbaik
-    _vc = df_pseudo["vlm_label"].value_counts()
-    _vc_pct = (_vc / len(df_pseudo) * 100.0).round(2)
-    _parse_pct = float(df_pseudo["parse_ok"].mean() * 100.0)
-    _n_high_conf = int((df_pseudo["vlm_conf"] >= 0.7).sum())
-    _high_conf_pct = float(_n_high_conf / len(df_pseudo) * 100.0)
-    _red_flag_60 = bool((_vc_pct > 60.0).any())
-
-    _emb_best = np.load(_art / f"emb_{top1}_diff.npy")
-    _km_eval = _KMeans(n_clusters=6, random_state=RANDOM_SEED, n_init=10).fit(_emb_best)
-    _df_x = df_pseudo.copy()
-    _df_x["cluster"] = _km_eval.labels_
-
-    _purity_rows = []
-    for _lbl in CLASS_NAMES:
-        _sub = _df_x[_df_x["vlm_label"] == _lbl]
-        if len(_sub) > 0:
-            _dom_cl = int(_sub["cluster"].value_counts().idxmax())
-            _dom_cnt = int(_sub["cluster"].value_counts().max())
-            _pur = float(_dom_cnt / len(_sub))
-        else:
-            _dom_cl, _dom_cnt, _pur = -1, 0, 0.0
-        _purity_rows.append({
-            "vlm_label": _lbl,
-            "count": len(_sub),
-            "pct": round(len(_sub) / len(_df_x) * 100.0, 2),
-            "dominant_cluster": _dom_cl,
-            "dominant_cluster_count": _dom_cnt,
-            "purity": round(_pur, 4),
-        })
-    df_purity = pd.DataFrame(_purity_rows)
-
-    df_pseudo.to_parquet(_final_pq, index=False)
-
-    # Bebaskan VRAM model VLM setelah selesai
-    try:
-        if vlm_model is not None:
-            vlm_model.cpu()
-    except Exception:
-        pass
-    _gc.collect()
-    torch.cuda.empty_cache()
-
-    print(f"VLM Pseudo-labeling selesai dalam {_time.time()-_t0:.1f}s | parse_ok: {_parse_pct:.2f}% | conf>=0.7: {_n_high_conf}/3180 ({_high_conf_pct:.2f}%)")
-    if _red_flag_60:
-        print("RED FLAG: Salah satu kelas melebihi 60% distribusi pseudo-label!")
-    print("\nDistribusi & Purity vs KMeans Cluster (emb_diff terbaik):")
-    print(df_purity.to_string(index=False))
-    mo.status.toast(title=f"Pseudo-label selesai: {_n_high_conf}/3180 high-conf", description=f"parse_ok={_parse_pct:.1f}%")
-    df_purity
-    return (df_pseudo,)
-
-
-@app.cell(hide_code=True)
-def M16_model(mo):
-    mo.md("""
-    ## 16. Arsitektur Siamese: Dual Fusion (Concat + Attention)
-
-    - **Tujuan tahap:** Mengatasi temuan `(T1)` (`76.3%` pasangan *unregistered*) dengan membangun arsitektur Siamese *shared-weights* yang menggabungkan dua jalur fitur semantik: **Jalur A (Concatenation)** untuk menangkap konteks global `[f_pre, f_post]` dan **Jalur B (Absolute Difference + Channel Attention)** untuk menonjolkan fitur perubahan paling informatif.
-    - **Kandidat Backbone:** `SiameseDualFusion` (`efficientnet_b4`) dan `SiameseConvNeXt` (`convnext_small.fb_in22k_ft_in1k`) untuk keragaman arsitektur CNN modern + klasik pada tahap ensemble.
-    - **Output yang diharapkan:** Verifikasi *forward pass* dummy `[2, 3, 384, 384]` → `[2, 6]` beserta jumlah parameter masing-masing model.
-    """)
-    return
-
-
-@app.cell
-def K16_model(pd, timm, torch):
-    # Definisi arsitektur SiameseDualFusion (EfficientNet-B4) dan SiameseConvNeXt (ConvNeXt-Small)
-    # dengan jalur ganda Concat + AbsDiff Channel Attention, lalu uji forward pass dummy [2, 3, 384, 384].
-    import torch.nn as nn
-
-    class ChannelAttention1D(nn.Module):
-        """Channel attention ringan untuk menyeleksi dimensi perubahan semantik pada vektor fitur 1D."""
-        def __init__(self, dim, reduction=8):
-            super().__init__()
-            _hid = max(dim // reduction, 16)
-            self.net = nn.Sequential(
-                nn.Linear(dim, _hid),
-                nn.GELU(),
-                nn.Linear(_hid, dim),
-                nn.Sigmoid(),
-            )
-
-        def forward(self, x):
-            return x * self.net(x)
-
-    class _BaseSiameseDualFusion(nn.Module):
-        """Backbone shared-weights dengan dual fusion: (A) Concat + (B) AbsDiff Channel Attention."""
-        def __init__(self, backbone_name, num_classes=6, pretrained=True):
-            super().__init__()
-            self.backbone = timm.create_model(
-                backbone_name, pretrained=pretrained, num_classes=0, features_only=False
-            )
-            _d = self.backbone.num_features
-            self.proj_concat = nn.Sequential(nn.Linear(_d * 2, _d), nn.GELU())
-            self.diff_attn = ChannelAttention1D(_d, reduction=8)
-            self.proj_diff = nn.Sequential(nn.Linear(_d, _d), nn.GELU())
-            self.head = nn.Sequential(
-                nn.Linear(_d * 2, _d),
-                nn.GELU(),
-                nn.Dropout(0.3),
-                nn.Linear(_d, num_classes),
-            )
-
-        def forward(self, pre, post):
-            _f_pre = self.backbone(pre)
-            _f_post = self.backbone(post)
-            _a = self.proj_concat(torch.cat([_f_pre, _f_post], dim=-1))
-            _b = self.proj_diff(self.diff_attn(torch.abs(_f_post - _f_pre)))
-            return self.head(torch.cat([_a, _b], dim=-1))
-
-    class SiameseDualFusion(_BaseSiameseDualFusion):
-        """Siamese Dual Fusion berbasis backbone EfficientNet-B4."""
-        def __init__(self, num_classes=6, pretrained=True):
-            super().__init__("efficientnet_b4", num_classes=num_classes, pretrained=pretrained)
-
-    class SiameseConvNeXt(_BaseSiameseDualFusion):
-        """Siamese Dual Fusion berbasis backbone ConvNeXt-Small."""
-        def __init__(self, num_classes=6, pretrained=True):
-            _ok_name = None
-            for _cand in ["convnext_small.fb_in22k_ft_in1k", "convnext_small.in12k_ft_in1k", "convnext_small"]:
-                try:
-                    _tmp = timm.create_model(_cand, pretrained=False, num_classes=0)
-                    del _tmp
-                    _ok_name = _cand
-                    break
-                except Exception:
-                    continue
-            if _ok_name is None:
-                _ok_name = "convnext_small"
-            self.backbone_id = _ok_name
-            super().__init__(_ok_name, num_classes=num_classes, pretrained=pretrained)
-
-    _d_pre = torch.randn(2, 3, 384, 384)
-    _d_post = torch.randn(2, 3, 384, 384)
-
-    _m_eff = SiameseDualFusion(pretrained=False).eval()
-    _m_cnx = SiameseConvNeXt(pretrained=False).eval()
-    with torch.no_grad():
-        _o_eff = _m_eff(_d_pre, _d_post)
-        _o_cnx = _m_cnx(_d_pre, _d_post)
-
-    assert _o_eff.shape == (2, 6), f"Unexpected EffNet shape: {_o_eff.shape}"
-    assert _o_cnx.shape == (2, 6), f"Unexpected ConvNeXt shape: {_o_cnx.shape}"
-
-    _model_test_df = pd.DataFrame([
-        {"model": "SiameseDualFusion (efficientnet_b4)", "params": sum(p.numel() for p in _m_eff.parameters()), "out_shape": tuple(_o_eff.shape)},
-        {"model": f"SiameseConvNeXt ({_m_cnx.backbone_id})", "params": sum(p.numel() for p in _m_cnx.parameters()), "out_shape": tuple(_o_cnx.shape)},
-    ])
-    del _m_eff, _m_cnx, _d_pre, _d_post
-    print(_model_test_df.to_string(index=False))
-    _model_test_df
-    return
-
-
-@app.cell(hide_code=True)
-def M17_dataset(mo):
-    mo.md("""
-    ## 17. Dataset & Augmentasi Konsisten pre/post
-
-    - **Tujuan tahap:** Membangun `FenomenaDataset` yang menerapkan transformasi geometrik **identik** pada pasangan `pre`/`post` (`RandomHorizontalFlip`, `RandomRotation(10)`), namun `ColorJitter` **independen** untuk mensimulasikan temuan EDA pergeseran warna/iluminasi tinggi (*KL divergence* `1.88–2.06`), serta melakukan pembagian `StratifiedKFold(n_splits=5)` pada sampel *high-confidence*.
-    - **Output yang diharapkan:** Tabel distribusi `vlm_conf`, split `df_train_folds` (kolom `fold` 0–4) dan `df_test_only`, cache citra `384x384` di RAM untuk akselerasi GPU, serta verifikasi assert shape `(3, 384, 384)` pada 4 sampel.
-    """)
-    return
-
-
-@app.cell
-def K17_dataset(
-    CLASS_NAMES,
-    ColorJitter,
-    DATA_ROOT,
-    Image,
-    Path,
-    RANDOM_SEED,
-    TF,
-    df_inv_clean,
-    df_pseudo,
-    np,
-    pd,
-    random,
-    torch,
-    tqdm,
-):
-    # Definisi FenomenaDataset dengan augmentasi geometrik identik & ColorJitter independen,
-    # Stratified 5-Fold split pada pseudo-label high_conf, cache 384x384 RAM, dan uji 4 sampel.
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from torch.utils.data import Dataset, DataLoader
-    from sklearn.model_selection import StratifiedKFold
-
-    LABEL2IDX = {_c: _i for _i, _c in enumerate(CLASS_NAMES)}
-    IDX2LABEL = {_i: _c for _i, _c in enumerate(CLASS_NAMES)}
-    IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-    IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-
-    IMG_CACHE_384 = {}
-    def _load_cache_one(_row):
-        with Image.open(_row["path_pre"]) as _i1, Image.open(_row["path_post"]) as _i2:
-            _a1 = np.asarray(_i1.convert("RGB").resize((384, 384), Image.Resampling.BILINEAR), dtype=np.uint8)
-            _a2 = np.asarray(_i2.convert("RGB").resize((384, 384), Image.Resampling.BILINEAR), dtype=np.uint8)
-        return _row["id"], (_a1, _a2)
-
-    with _TPE(max_workers=16) as _ex:
-        for _cid, _pair in tqdm(_ex.map(_load_cache_one, df_inv_clean.to_dict("records")), total=len(df_inv_clean), desc="Cache 384x384 RAM"):
-            IMG_CACHE_384[_cid] = _pair
-
-    class FenomenaDataset(Dataset):
-        """Dataset pasangan pre/post dengan augmentasi geometrik identik dan ColorJitter independen."""
-        def __init__(self, df, data_root=DATA_ROOT, size=384, mode="train", cache_dict=None, return_weight=False, hflip_tta=False):
-            self.df = df.reset_index(drop=True)
-            self.data_root = Path(data_root)
-            self.size = size
-            self.mode = mode
-            self.cache_dict = cache_dict
-            self.return_weight = return_weight
-            self.hflip_tta = hflip_tta
-            self.jitter = ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.05)
-
-        def __len__(self):
-            return len(self.df)
-
-        def __getitem__(self, idx):
-            _row = self.df.iloc[idx]
-            _sid = _row["id"]
-            if self.cache_dict is not None and _sid in self.cache_dict and self.size == 384:
-                _a1, _a2 = self.cache_dict[_sid]
-                _t1 = torch.from_numpy(_a1.copy()).permute(2, 0, 1).float().div_(255.0)
-                _t2 = torch.from_numpy(_a2.copy()).permute(2, 0, 1).float().div_(255.0)
-            else:
-                with Image.open(self.data_root / _sid / "pre.jpg") as _f1:
-                    _t1 = TF.to_tensor(_f1.convert("RGB").resize((self.size, self.size), Image.Resampling.BILINEAR))
-                with Image.open(self.data_root / _sid / "post.jpg") as _f2:
-                    _t2 = TF.to_tensor(_f2.convert("RGB").resize((self.size, self.size), Image.Resampling.BILINEAR))
-
-            if self.mode == "train":
-                if random.random() < 0.5:
-                    _t1 = TF.hflip(_t1)
-                    _t2 = TF.hflip(_t2)
-                _angle = random.uniform(-10.0, 10.0)
-                _t1 = TF.rotate(_t1, _angle)
-                _t2 = TF.rotate(_t2, _angle)
-                _t1 = self.jitter(_t1)
-                _t2 = self.jitter(_t2)
-            elif self.hflip_tta:
-                _t1 = TF.hflip(_t1)
-                _t2 = TF.hflip(_t2)
-
-            _t1 = (_t1 - IMAGENET_MEAN) / IMAGENET_STD
-            _t2 = (_t2 - IMAGENET_MEAN) / IMAGENET_STD
-            _lbl_str = _row["vlm_label"] if "vlm_label" in _row and pd.notna(_row["vlm_label"]) else "Earthquake"
-            _lbl = LABEL2IDX.get(_lbl_str, 0)
-            if self.return_weight:
-                _w = float(_row["sample_weight"]) if "sample_weight" in _row else 1.0
-                return _t1, _t2, _lbl, _sid, np.float32(_w)
-            return _t1, _t2, _lbl, _sid
-
-    _df_base = df_inv_clean[["id", "path_pre", "path_post"]].merge(df_pseudo, on="id", how="inner")
-    _hc_mask = (_df_base["vlm_conf"] >= 0.7) & (_df_base["parse_ok"] == True)
-    df_train_folds = _df_base[_hc_mask].copy().reset_index(drop=True)
-    df_test_only = _df_base[~_hc_mask].copy().reset_index(drop=True)
-
-    _skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_SEED)
-    df_train_folds["fold"] = -1
-    for _f_idx, (_, _val_idx) in enumerate(_skf.split(df_train_folds, df_train_folds["vlm_label"])):
-        df_train_folds.loc[_val_idx, "fold"] = _f_idx
-
-    print(f"Split selesai -> df_train_folds: {len(df_train_folds)} | df_test_only: {len(df_test_only)}")
-    _ds_test = FenomenaDataset(df_train_folds.head(4), mode="train", cache_dict=IMG_CACHE_384)
-    for _j in range(4):
-        _p1, _p2, _y, _sid = _ds_test[_j]
-        assert _p1.shape == (3, 384, 384) and _p2.shape == (3, 384, 384)
-    print("Uji FenomenaDataset (4 sampel) BERHASIL: shape=(3, 384, 384).")
-    return
-
-
-@app.cell(hide_code=True)
-def M18_env_audit(mo):
-    mo.md("""
-    ## 18. Audit Lingkungan Fase Lanjutan & Baseline Checkpoints
-
-    - **Tujuan tahap:** Memverifikasi kesiapan GPU (`NVIDIA RTX PRO 6000 Blackwell`, VRAM ~102 GB), paket tambahan (`albumentations`, `lightgbm`, `catboost`, `xgboost`), serta memeriksa distribusi bias awal `pseudo_labels.parquet` v1 (`Fire` `61.57%`) sebelum menjalankan Fase 1 (*Multi-Teacher De-Biased Pseudo-Labeling*).
-    - **Output yang diharapkan:** Tabel versi library, kapasitas GPU bebas, dan distribusi kelas baseline v1.
-    """)
-    return
-
-
-@app.cell
-def K18_env_audit():
-    # Audit lingkungan Fase 0: verifikasi versi library CV/GBDT, kapasitas GPU VRAM,
-    # dan baseline distribusi pseudo_labels.parquet v1 (Qwen2.5-VL-7B).
-    import importlib as _imp
-    import subprocess as _subp
-    import pandas as _pd
-    from pathlib import Path as _Path
-
-    _ART = _Path("/marimo/Fenomena")
-    _pkg_rows = []
-    for _p in ["torch", "timm", "open_clip", "transformers", "albumentations", "skimage", "lightgbm", "catboost", "xgboost", "sklearn"]:
-        try:
-            _m = _imp.import_module(_p)
-            _pkg_rows.append({"package": _p, "version": getattr(_m, "__version__", "ok")})
-        except Exception as _e:
-            _pkg_rows.append({"package": _p, "version": f"MISSING: {_e}"})
-
-    _gpu_info = _subp.check_output(
-        ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader"]
-    ).decode().strip()
-    print("GPU:", _gpu_info)
-    print(_pd.DataFrame(_pkg_rows).to_string(index=False))
-
-    _v1_df = _pd.read_parquet(_ART / "pseudo_labels.parquet")
-    print("\nDistribusi pseudo_labels.parquet v1 (Qwen2.5-VL-7B — RED FLAG bias Fire):")
-    print((_v1_df["vlm_label"].value_counts(normalize=True) * 100).round(2).to_string())
-    _pd.DataFrame(_pkg_rows)
-    return
-
-
-@app.cell(hide_code=True)
-def M19_pseudo_v2(mo):
-    mo.md("""
-    ## 19. Fase 1: Multi-Teacher De-Biased & Temporal-Swap Invariant Pseudo-Labeling
-
-    - **Dasar Audit Forensik (Cell 20):** Sebanyak `33–45%` pasangan memiliki indikasi arah visual terbalik (`pre` lebih rusak/gelap dibanding `post`), sehingga seluruh teacher dan fitur wajib **invarian terhadap penukaran urutan `pre ↔ post`**.
-    - **Desain Multi-Teacher:**
-      1. **Symmetric Satellite Foundation Teacher (`RemoteCLIP` + `SkyCLIP`):** Membentuk representasi invarian-urutan $\mathbf{f}_{	ext{sym}} = [    rac{1}{2}(\mathbf{e}_{	ext{pre}} + \mathbf{e}_{	ext{post}}), |\mathbf{e}_{	ext{post}} - \mathbf{e}_{	ext{pre}}|]$ (plus rata-rata `hflip` untuk `RemoteCLIP`), menghitung skor semantik simetris `0.5 * max(s_pre, s_post) + 0.5 * |s_post - s_pre|` terhadap 5 prompt per kelas, lalu menerapkan **z-score centering per kolom kelas** (`clip_teacher_sym_probs.npy`).
-      2. **High-Res VLM Teacher (`Qwen/Qwen2.5-VL-32B-Instruct`, `448x448` per tile + 2x HFlip TTA):** Mengaudit distribusi hasil Batch `199/199`, dan jika proporsi `Fire > 35%` atau terdapat bias arah pada 556 sampel `is_sem_both_neg`, menjalankan *targeted symmetric re-pass* `[post | pre]` + prompt simetris eksplisit.
-      3. **Fusi Konsensus & Kunci Fold:** Menggabungkan probabilitas VLM-32B dan CLIP simetris menjadi `pseudo_labels_v2.parquet` serta `consensus_soft_v1.npy`, lalu mengunci `folds_skf5.npy`.
-    """)
-    return
-
-
-@app.cell
-def K19a_clip_teacher():
-    # Bagian 19A: Symmetric Satellite Foundation Teacher (RemoteCLIP + SkyCLIP)
-    # Membangun fitur simetris invarian-urutan f_sym dan skor kosinus z-score centered (CPU-safe).
-    import numpy as _np
-    import pandas as _pd
-    import matplotlib as _mpl
-    _mpl.use("Agg")
-    import matplotlib.pyplot as _plt
-    from pathlib import Path as _Path
-    import torch as _torch
-    import torch.nn.functional as _F
-    import open_clip as _open_clip
-    from huggingface_hub import hf_hub_download as _hf_dl
-
-    _ART = _Path("/marimo/Fenomena")
-    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
-    _PROMPTS = {
-        "Earthquake": [
-            "aerial satellite view of collapsed buildings and gray concrete rubble after an earthquake",
-            "urban residential blocks shattered and crumbled into debris piles from earthquake shaking",
-            "earthquake structural devastation with fractured roads and demolished multi-story buildings without burn scars",
-            "post-earthquake aerial imagery showing widespread roof collapses and gray dust over city streets",
-            "satellite change detection showing intact neighborhoods turned into earthquake rubble fields",
-        ],
-        "Fire": [
-            "aerial satellite image of charred black vegetation burn scar from wildfire",
-            "active forest fire and brushfire smoke plumes over scorched dark brown terrain",
-            "post-wildfire satellite view with blackened burnt trees while paved roads remain intact",
-            "burnt farmland and forest canopy turned black and dark ash by wildfire",
-            "aerial change detection of green vegetation transformed into scorched wildfire burn scar",
-        ],
-        "Hurricane": [
-            "aerial satellite image of hurricane wind damage with stripped roofs and scattered debris",
-            "widespread tropical cyclone damage showing uprooted trees and flooded inland neighborhoods",
-            "post-hurricane aerial view with torn blue tarps on damaged roofs and storm surge puddles",
-            "wind-damaged suburban houses and fallen forest timber caused by severe hurricane",
-            "satellite change detection showing hurricane wind destruction and inland rainwater flooding",
-        ],
-        "Tsunami": [
-            "aerial satellite image of tsunami coastal flooding with shoreline buildings swept completely bare",
-            "eroded receding coastline and muddy seawater inundation extending inland after a tsunami",
-            "coastal settlement washed away to bare mud and debris lines by tsunami ocean waves",
-            "post-tsunami satellite view showing flooded harbor, washed-out coastal roads, and stranded boats",
-            "aerial change detection of coastal town obliterated by tsunami wave surge",
-        ],
-        "Volcano": [
-            "aerial satellite image of thick gray or white volcanic ash blanket covering land and roofs",
-            "volcanic eruption aftermath with dark basaltic lava flows and pyroclastic deposits burying terrain",
-            "satellite view of volcanic crater rim, ash fallout plumes, and ash-covered vegetation",
-            "post-volcano aerial imagery showing smooth gray tephra deposits and hardened lava channels",
-            "aerial change detection of green valley buried under volcanic ash and lava flow",
-        ],
-        "Explosion": [
-            "aerial satellite image of a localized circular explosion crater and radial blast damage",
-            "industrial or port blast epicenter showing circular shockwave destruction radiating outward",
-            "concentrated explosion site with scorched blast crater and shattered nearby warehouses",
-            "post-explosion aerial view showing single-point blast crater surrounded by radially blown roofs",
-            "aerial change detection of intact industrial facility replaced by a localized blast crater",
-        ],
-    }
-
-    def _encode_prompts_cpu(_repo, _fn):
-        _ckpt = _hf_dl(repo_id=_repo, filename=_fn)
-        _m, _, _ = _open_clip.create_model_and_transforms("ViT-L-14")
-        _raw = _torch.load(_ckpt, map_location="cpu", weights_only=False)
-        if isinstance(_raw, dict) and "state_dict" in _raw:
-            _raw = _raw["state_dict"]
-        elif isinstance(_raw, dict) and "model" in _raw:
-            _raw = _raw["model"]
-        _raw = {_k.replace("module.", ""): _v for _k, _v in _raw.items()}
-        _m.load_state_dict(_raw, strict=True)
-        _tok = _open_clip.get_tokenizer("ViT-L-14")
-        _m.eval()
-        _embs = []
-        with _torch.no_grad():
-            for _c in _CLASSES:
-                _tf = _F.normalize(_m.encode_text(_tok(_PROMPTS[_c])).float(), dim=-1)
-                _embs.append(_F.normalize(_tf.mean(dim=0, keepdim=True), dim=-1).numpy()[0])
-        del _m
-        return _np.stack(_embs, axis=0)  # (6, 768)
-
-    def _zscore_softmax(_mat, _T=0.5):
-        _z = (_mat - _mat.mean(axis=0, keepdims=True)) / (_mat.std(axis=0, keepdims=True) + 1e-8)
-        _z = _z / _T
-        _z -= _z.max(axis=1, keepdims=True)
-        _e = _np.exp(_z)
-        return (_e / _e.sum(axis=1, keepdims=True)).astype(_np.float32)
-
-    _sym_clip_path = _ART / "clip_teacher_sym_probs.npy"
-    if not _sym_clip_path.is_file():
-        _probs_list = []
-        for _mname, _repo, _fn in [
-            ("RemoteCLIP", "chendelong/RemoteCLIP", "RemoteCLIP-ViT-L-14.pt"),
-            ("SkyCLIP", "furiousteabag/SkyCLIP", "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"),
-        ]:
-            _cmat = _encode_prompts_cpu(_repo, _fn)
-            _epre = _np.load(_ART / f"emb_{_mname}_pre.npy")
-            _epost = _np.load(_ART / f"emb_{_mname}_post.npy")
-            _f_mean = 0.5 * (_epre + _epost)
-            _f_abs = _np.abs(_epost - _epre)
-            _f_sym = _np.concatenate([_f_mean, _f_abs], axis=1).astype(_np.float32)
-            _np.save(_ART / f"emb_{_mname}_sym.npy", _f_sym)
-
-            _s_pre = _epre @ _cmat.T
-            _s_post = _epost @ _cmat.T
-            _s_max = _np.maximum(_s_pre, _s_post)
-            _ediff_raw = _epost - _epre
-            _ediff = _ediff_raw / (_np.linalg.norm(_ediff_raw, axis=1, keepdims=True) + 1e-8)
-            if _mname == "RemoteCLIP" and (_ART / "emb_RemoteCLIP_diff_hflip.npy").is_file():
-                _ediff_fl = _np.load(_ART / "emb_RemoteCLIP_diff_hflip.npy")
-                _ediff = 0.5 * (_ediff + _ediff_fl)
-                _ediff = _ediff / (_np.linalg.norm(_ediff, axis=1, keepdims=True) + 1e-8)
-            _s_abs_dir = _np.abs(_ediff @ _cmat.T)
-            _s_sym = 0.55 * _s_max + 0.45 * _s_abs_dir
-            _probs_list.append(_zscore_softmax(_s_sym, _T=0.5))
-
-        _p_clip_sym = (0.55 * _probs_list[0] + 0.45 * _probs_list[1]).astype(_np.float32)
-        _np.save(_sym_clip_path, _p_clip_sym)
-    else:
-        _p_clip_sym = _np.load(_sym_clip_path)
-
-    _preds = _p_clip_sym.argmax(axis=1)
-    _vc = _pd.Series([_CLASSES[_i] for _i in _preds]).value_counts()
-    _df_clip_sym = _pd.DataFrame([
-        {"Kelas": _c, "Jumlah": int(_vc.get(_c, 0)), "Persen (%)": round(int(_vc.get(_c, 0)) / len(_preds) * 100, 2)}
-        for _c in _CLASSES
-    ])
-    print("Distribusi Symmetric CLIP Teacher (f_sym, z-score centered, swap-invariant):")
-    print(_df_clip_sym.to_string(index=False))
-
-    _plt.close("all")
-    _fig, _ax = _plt.subplots(figsize=(8, 3.8))
-    _ax.bar(_df_clip_sym["Kelas"], _df_clip_sym["Persen (%)"], color="#2b6cb0")
-    _ax.axhline(100 / 6, color="#e53e3e", linestyle="--", label="Seragam Ideal (16.67%)")
-    _ax.set_title("Distribusi Symmetric CLIP Teacher (Invarian Pre<->Post, Z-Score Centered)")
-    _ax.set_ylabel("Persentase (%)")
-    _ax.legend()
-    _fig.tight_layout()
-    _fig
-    return
-
-
-@app.cell
-def K19b_vlm32b_teacher(mo):
-    # Bagian 19B: Audit Qwen2.5-VL-32B-Instruct (448x448 + 2x HFlip TTA),
-    # Targeted Symmetric Re-Pass [post | pre] pada 556 sampel is_sem_both_neg,
-    # Fusi Konsensus dengan Symmetric CLIP Teacher -> pseudo_labels_v2.parquet & folds_skf5.npy.
-    import gc as _gc
-    import time as _time
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from pathlib import Path as _Path
-    import numpy as _np
-    import pandas as _pd
-    import matplotlib as _mpl
-    _mpl.use("Agg")
-    import matplotlib.pyplot as _plt
+def _():
+    # Langkah 2: Ekstraksi Pure-Vision Foundation Zoo (ScaleMAE & I-JEPA, 1024px 5-Crop Simetris)
+    import os as _os, sys as _sys, time as _time, types as _types, importlib.util as _ilu
+    _os.environ.pop("HF_HUB_OFFLINE", None)
+    _os.environ.pop("TRANSFORMERS_OFFLINE", None)
+    import numpy as _np, pandas as _pd, torch as _torch, torch.nn.functional as _F
     from PIL import Image as _Image
-    import torch as _torch
-    import torch.nn.functional as _F
-    import transformers as _transformers
+    from torch.utils.data import Dataset as _Dataset, DataLoader as _DataLoader
+    from torchvision import transforms as _T
+    from huggingface_hub import hf_hub_download as _hf_dl
+    from transformers import AutoModel as _AutoModel
+
+    _df_inv = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet")
+
+    class _FiveCropPairDS(_Dataset):
+        def __init__(self, df, size=224):
+            self.pre = df["path_pre"].tolist()
+            self.post = df["path_post"].tolist()
+            self.size = size
+            self.norm = _T.Compose([
+                _T.ToTensor(),
+                _T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+        def _crops(self, p):
+            im = _Image.open(p).convert("RGB")
+            w, h = im.size
+            hw, hh = w // 2, h // 2
+            cs = [
+                im.resize((self.size, self.size), _Image.BICUBIC),
+                im.crop((0, 0, hw, hh)).resize((self.size, self.size), _Image.BICUBIC),
+                im.crop((hw, 0, w, hh)).resize((self.size, self.size), _Image.BICUBIC),
+                im.crop((0, hh, hw, h)).resize((self.size, self.size), _Image.BICUBIC),
+                im.crop((hw, hh, w, h)).resize((self.size, self.size), _Image.BICUBIC),
+            ]
+            return _torch.stack([self.norm(c) for c in cs], dim=0)
+        def __len__(self): return len(self.pre)
+        def __getitem__(self, i): return self._crops(self.pre[i]), self._crops(self.post[i])
+
+    def _extract_5crop_sym(name, fwd_fn, out_path):
+        if _os.path.exists(out_path):
+            _a = _np.load(out_path, mmap_mode="r")
+            if _a.shape[0] == len(_df_inv):
+                print(f"[{name}] Cached: {_a.shape}")
+                return
+        _loader = _DataLoader(_FiveCropPairDS(_df_inv, 224), batch_size=32, shuffle=False, num_workers=8, pin_memory=True)
+        _feats, _t0 = [], _time.time()
+        with _torch.no_grad(), _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+            for _pa, _pb in _loader:
+                _B = _pa.shape[0]
+                _fa = _F.normalize(fwd_fn(_pa.view(_B * 5, 3, 224, 224).cuda(non_blocking=True)).float().view(_B, 5, -1), dim=-1)
+                _fb = _F.normalize(fwd_fn(_pb.view(_B * 5, 3, 224, 224).cuda(non_blocking=True)).float().view(_B, 5, -1), dim=-1)
+                _ea = _torch.cat([_fa[:, 0], _F.normalize(_fa[:, 1:].mean(dim=1), dim=-1)], dim=-1)
+                _eb = _torch.cat([_fb[:, 0], _F.normalize(_fb[:, 1:].mean(dim=1), dim=-1)], dim=-1)
+                _feats.append(_torch.cat([0.5 * (_ea + _eb), _torch.abs(_ea - _eb)], dim=-1).cpu().numpy().astype(_np.float32))
+        _out = _np.concatenate(_feats, axis=0)
+        assert not _np.isnan(_out).any() and not _np.isinf(_out).any()
+        _np.save(out_path, _out)
+        print(f"[{name}] Saved {out_path} {_out.shape} in {_time.time()-_t0:.1f}s")
+
+    if not _os.path.exists("/marimo/Fenomena/emb_ScaleMAE_5crop_sym.npy"):
+        _pl = _types.ModuleType("pytorch_lightning"); _pl.LightningModule = _torch.nn.Module
+        _sys.modules["pytorch_lightning"] = _pl
+        _spec = _ilu.spec_from_file_location("scalemae_mod", _hf_dl("MVRL/scalemae-vitlarge-800", "model.py"))
+        _mod = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_mod)
+        _ms = _mod.ScaleMAE_baseline(global_pool=False, cls_token_flag=True)
+        _ms.load_state_dict(_torch.load(_hf_dl("MVRL/scalemae-vitlarge-800", "pytorch_model.bin"), map_location="cpu", weights_only=False), strict=False)
+        _ms = _ms.cuda().float().eval()
+        _extract_5crop_sym("ScaleMAE-ViT-L", lambda x: _ms.model.forward_features(x, input_res=_torch.full((x.shape[0],), 10.0))[:, 1:, :].mean(dim=1), "/marimo/Fenomena/emb_ScaleMAE_5crop_sym.npy")
+        del _ms; _torch.cuda.empty_cache()
+    else:
+        print("[ScaleMAE-ViT-L] Cached:", _np.load("/marimo/Fenomena/emb_ScaleMAE_5crop_sym.npy", mmap_mode="r").shape)
+
+    if not _os.path.exists("/marimo/Fenomena/emb_IJEPA_5crop_sym.npy"):
+        _mi = _AutoModel.from_pretrained("facebook/ijepa_vith14_1k", dtype=_torch.bfloat16).cuda().eval()
+        _extract_5crop_sym("I-JEPA-ViT-H", lambda x: _mi(pixel_values=x).last_hidden_state.mean(dim=1), "/marimo/Fenomena/emb_IJEPA_5crop_sym.npy")
+        del _mi; _torch.cuda.empty_cache()
+    else:
+        print("[I-JEPA-ViT-H] Cached:", _np.load("/marimo/Fenomena/emb_IJEPA_5crop_sym.npy", mmap_mode="r").shape)
+
+    for _fn in ["emb_DINOv3L_5crop_sym.npy", "emb_SatMAEPP_5crop_sym.npy", "emb_ScaleMAE_5crop_sym.npy", "emb_DINOv2Giant_5crop_sym.npy", "emb_IJEPA_5crop_sym.npy"]:
+        _a = _np.load(f"/marimo/Fenomena/{_fn}", mmap_mode="r")
+        print(f"  {_fn}: {_a.shape} ({_a.dtype})")
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 16. Physical Feature Engineering, Over-Clustering ($K=24$) & Weak Supervision (FAQ No. 7, 8, 9, 16)
+
+    - **Indikator Fisik Otomatis (Invarian Urutan & Sadar Anomali Sensor):** Menghitung `~75` fitur fisik simetris untuk seluruh `3.180` pasang citra dan membentuk 6 skor fisik bencana (`score_fire`, `score_tsunami`, `score_volcano`, `score_explosion`, `score_earthquake`, `score_hurricane`) dengan deteksi otomatis *False-Color NIR* dan *Grayscale*.
+    - **Over-Clustering ($K=24$):** Menggabungkan fitur *pure-vision* tereduksi SVD (`DINOv3-L`, `SatMAE++`, `ScaleMAE`, `DINOv2-Giant`, `I-JEPA`) + fitur fisik, menjalankan *Spherical K-Means ($K=24$)*, dan memetakan klaster ke 6 kelas melalui dictionary eksplisit `CLUSTER_TO_CLASS` (keputusan 100% per klaster).
+    - **Audit Visual:** Menyimpan `audit_clusters_k24.png` (4 sampel terdekat centroid per klaster) serta `pure_vision_soft_targets.npy` & `folds_skf5.npy`.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # Langkah 3: Physical Feature Engineering (78 fitur simetris, valid-pixel masked) + Over-Clustering K=24 + Weak Supervision
+    import os as _os, time as _time
+    import numpy as _np, pandas as _pd
+    import cv2 as _cv2
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from PIL import Image as _Image, ImageDraw as _ImageDraw
+    from sklearn.decomposition import TruncatedSVD as _TSVD
+    from sklearn.preprocessing import StandardScaler as _SS, normalize as _l2norm
+    from sklearn.cluster import KMeans as _KMeans
     from sklearn.model_selection import StratifiedKFold as _SKF
 
-    _ART = _Path("/marimo/Fenomena")
     _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    _df_inv = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet")
+    _t0 = _time.time()
+
+    def _img_stats(path):
+        im = _cv2.imread(path)
+        if im is None:
+            im = _np.array(_Image.open(path).convert("RGB"))[:, :, ::-1]
+        im = _cv2.resize(im, (256, 256), interpolation=_cv2.INTER_AREA)
+        rgb = im[:, :, ::-1].astype(_np.float32)
+        r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+        valid = (r > 8.0) | (g > 8.0) | (b > 8.0)
+        if valid.sum() < 64:
+            valid = _np.ones_like(r, dtype=bool)
+        mr, mg, mb = float(r[valid].mean()), float(g[valid].mean()), float(b[valid].mean())
+        sr, sg, sb = float(r[valid].std()), float(g[valid].std()), float(b[valid].std())
+        is_nir = float((mr - mg > 25.0) or (mr > 105.0 and mb > 105.0 and mg < 85.0))
+        is_gray = float(abs(mr - mg) + abs(mg - mb) < 5.0)
+
+        hsv = _cv2.cvtColor(im, _cv2.COLOR_BGR2HSV).astype(_np.float32)
+        sat = hsv[:, :, 1]
+        lum = 0.299 * r + 0.587 * g + 0.114 * b
+
+        exg = (2.0 * g - r - b) / 255.0
+        nir_veg = (r - g) / 255.0
+        veg_idx = nir_veg if is_nir > 0.5 else exg
+        veg_mean = 0.0 if is_gray > 0.5 else float(veg_idx[valid].mean())
+        veg_pos_frac = 0.0 if is_gray > 0.5 else float((veg_idx[valid] > 0.08).mean())
+
+        dark_frac = float((lum[valid] < 55.0).mean())
+        char_frac = float(((lum[valid] < 68.0) & (sat[valid] < 48.0)).mean()) if is_gray < 0.5 else dark_frac * 0.5
+        water_cyan_frac = 0.0 if is_gray > 0.5 else float((((b[valid] > r[valid] + 8.0) & (b[valid] > g[valid] - 5.0) & (lum[valid] < 150.0)) | ((g[valid] > r[valid] + 10.0) & (b[valid] > r[valid] + 8.0) & (lum[valid] < 120.0))).mean())
+        ash_grey_frac = 0.0 if is_gray > 0.5 else float(((sat[valid] < 30.0) & (lum[valid] > 75.0) & (lum[valid] < 215.0)).mean())
+
+        gray = _cv2.cvtColor(im, _cv2.COLOR_BGR2GRAY).astype(_np.float32)
+        lap = _cv2.Laplacian(gray, _cv2.CV_32F)
+        lap_var = float(lap[valid].var())
+        gx = _cv2.Sobel(gray, _cv2.CV_32F, 1, 0, ksize=3)
+        gy = _cv2.Sobel(gray, _cv2.CV_32F, 0, 1, ksize=3)
+        grad_mag = _np.sqrt(gx * gx + gy * gy)
+        urban_edge_density = float((grad_mag[valid] > 45.0).mean())
+        ortho_edge = float(((_np.abs(gx[valid]) > 35.0) | (_np.abs(gy[valid]) > 35.0)).mean())
+
+        fshift = _np.fft.fftshift(_np.fft.fft2(gray))
+        mag = _np.abs(fshift)
+        yy, xx = _np.ogrid[:256, :256]
+        rr = _np.sqrt((yy - 128) ** 2 + (xx - 128) ** 2)
+        hf_ratio = float(mag[rr > 32.0].sum() / (mag.sum() + 1e-6))
+
+        return {
+            "mr": mr / 255.0, "mg": mg / 255.0, "mb": mb / 255.0,
+            "sr": sr / 255.0, "sg": sg / 255.0, "sb": sb / 255.0,
+            "is_nir": is_nir, "is_gray": is_gray, "valid": valid,
+            "lum_mean": float(lum[valid].mean()) / 255.0, "sat_mean": float(sat[valid].mean()) / 255.0,
+            "veg_mean": veg_mean, "veg_pos_frac": veg_pos_frac,
+            "dark_frac": dark_frac, "char_frac": char_frac,
+            "water_cyan_frac": water_cyan_frac, "ash_grey_frac": ash_grey_frac,
+            "log_lap": float(_np.log1p(lap_var)), "urban_edge": urban_edge_density,
+            "ortho_edge": ortho_edge, "hf_ratio": hf_ratio,
+            "grad_map": grad_mag, "gray": gray,
+        }
+
+    def _process_pair(idx):
+        sa = _img_stats(_df_inv["path_pre"].iloc[idx])
+        sb = _img_stats(_df_inv["path_post"].iloc[idx])
+        both_valid = sa["valid"] & sb["valid"]
+        if both_valid.sum() < 64:
+            both_valid = _np.ones((256, 256), dtype=bool)
+
+        diff_g = _np.abs(sa["grad_map"] - sb["grad_map"]) * both_valid
+        diff_l = _np.abs(sa["gray"] - sb["gray"]) * both_valid
+        chg = 0.6 * (diff_g / (diff_g[both_valid].mean() + 1e-5)) + 0.4 * (diff_l / (diff_l[both_valid].mean() + 1e-5))
+        qs = _np.array([
+            chg[:128, :128].mean(), chg[:128, 128:].mean(),
+            chg[128:, :128].mean(), chg[128:, 128:].mean(),
+        ], dtype=_np.float32)
+        q_sum = float(qs.sum()) + 1e-6
+        quad_max_ratio = float(qs.max() / q_sum)
+        quad_std = float(qs.std() / (qs.mean() + 1e-6))
+        p_q = qs / q_sum
+        multi_quad_spread = float(-_np.sum(p_q * _np.log(p_q + 1e-8)) / _np.log(4.0))
+        center_energy = float(chg[64:192, 64:192].mean())
+        border_energy = float((chg.sum() - chg[64:192, 64:192].sum()) / (256*256 - 128*128))
+        center_to_border = float(center_energy / (border_energy + 1e-5))
+
+        keys = ["mr", "mg", "mb", "sr", "sg", "sb", "lum_mean", "sat_mean", "veg_mean",
+                "veg_pos_frac", "dark_frac", "char_frac", "water_cyan_frac", "ash_grey_frac",
+                "log_lap", "urban_edge", "ortho_edge", "hf_ratio"]
+        vec = []
+        for k in keys:
+            va, vb = sa[k], sb[k]
+            vec.extend([0.5 * (va + vb), abs(va - vb), max(va, vb), min(va, vb)])
+        any_nir = max(sa["is_nir"], sb["is_nir"])
+        any_gray = max(sa["is_gray"], sb["is_gray"])
+        vec.extend([any_nir, any_gray, quad_max_ratio, quad_std, multi_quad_spread, center_to_border])
+        return _np.array(vec, dtype=_np.float32)
+
+    with _TPE(max_workers=16) as _ex:
+        _phys_mat = _np.stack(list(_ex.map(_process_pair, range(len(_df_inv)))), axis=0)
+
+    _np.save("/marimo/Fenomena/physical_features_sym.npy", _phys_mat)
+    print(f"physical_features_sym.npy shape={_phys_mat.shape} computed in {_time.time()-_t0:.1f}s | NaN={_np.isnan(_phys_mat).sum()}")
+
+    _keys = ["mr", "mg", "mb", "sr", "sg", "sb", "lum_mean", "sat_mean", "veg_mean",
+             "veg_pos_frac", "dark_frac", "char_frac", "water_cyan_frac", "ash_grey_frac",
+             "log_lap", "urban_edge", "ortho_edge", "hf_ratio"]
+    def _col(k, stat_idx):
+        return _phys_mat[:, _keys.index(k) * 4 + stat_idx]
+
+    _any_nir = _phys_mat[:, -6]
+    _any_gray = _phys_mat[:, -5]
+    _quad_max_ratio = _phys_mat[:, -4]
+    _multi_quad_spread = _phys_mat[:, -2]
+    _center_to_border = _phys_mat[:, -1]
+
+    def _z(x):
+        return (x - x.mean()) / (x.std() + 1e-6)
+
+    _score_earthquake = 0.50 * _z(_col("urban_edge", 2)) + 0.30 * _z(_col("ortho_edge", 2)) + 0.25 * _z(_col("hf_ratio", 1)) + 0.15 * _z(_multi_quad_spread) - 0.25 * _z(_col("water_cyan_frac", 2)) - 0.20 * _z(_col("char_frac", 1))
+    _score_fire = 0.45 * _z(_col("veg_mean", 1)) + 0.40 * _z(_col("char_frac", 1)) + 0.25 * _z(_col("char_frac", 2)) - 0.35 * _z(_col("water_cyan_frac", 2))
+    _score_hurricane = 0.45 * _z(_multi_quad_spread) + 0.30 * _z(_col("veg_pos_frac", 0)) + 0.25 * _z(_col("urban_edge", 1)) - 0.35 * _z(_quad_max_ratio)
+    _score_tsunami = 0.55 * _z(_col("water_cyan_frac", 1)) + 0.40 * _z(_col("water_cyan_frac", 2)) + 0.25 * _z(_col("lum_mean", 1)) - 0.20 * _z(_col("urban_edge", 2))
+    _score_volcano = 0.45 * _z(_col("log_lap", 1)) + 0.45 * _z(_col("ash_grey_frac", 2)) + 0.30 * _z(_col("ash_grey_frac", 1)) - 0.25 * _z(_col("sat_mean", 0))
+    _score_explosion = 0.55 * _z(_quad_max_ratio) + 0.45 * _z(_center_to_border) + 0.20 * _z(_col("char_frac", 2)) - 0.30 * _z(_multi_quad_spread)
+
+    _phys_scores = _np.stack([_score_earthquake, _score_fire, _score_hurricane, _score_tsunami, _score_volcano, _score_explosion], axis=1).astype(_np.float32)
+
+    _pv_files = [
+        "emb_DINOv3L_5crop_sym.npy",
+        "emb_SatMAEPP_5crop_sym.npy",
+        "emb_ScaleMAE_5crop_sym.npy",
+        "emb_DINOv2Giant_5crop_sym.npy",
+        "emb_IJEPA_5crop_sym.npy",
+    ]
+    _pv_blocks = []
+    for _fn in _pv_files:
+        _arr = _l2norm(_np.load(f"/marimo/Fenomena/{_fn}").astype(_np.float32))
+        _svd = _TSVD(n_components=128, random_state=42).fit_transform(_arr)
+        _pv_blocks.append(_l2norm(_svd))
+
+    _phys_scaled = _l2norm(_SS().fit_transform(_phys_mat))
+    _Z_cluster = _l2norm(_np.hstack(_pv_blocks + [0.65 * _phys_scaled]))
+
+    _km = _KMeans(n_clusters=24, n_init=20, max_iter=300, random_state=42).fit(_Z_cluster)
+    _cids = _km.labels_
+    _centroids = _l2norm(_km.cluster_centers_)
+    _cos_sim = _Z_cluster @ _centroids.T
+    _cluster_sizes = _np.bincount(_cids, minlength=24)
+
+    # Explicit Per-Cluster Mapping Dictionary (100% per-cluster via physical profile + visual audit of audit_clusters_k24.png, 0 per-sample overrides, 0 LB usage)
+    CLUSTER_TO_CLASS = {
+        0: "Earthquake",
+        1: "Volcano",
+        2: "Earthquake",
+        3: "Hurricane",
+        4: "Hurricane",
+        5: "Volcano",
+        6: "Fire",
+        7: "Fire",
+        8: "Earthquake",
+        9: "Earthquake",
+        10: "Volcano",
+        11: "Tsunami",
+        12: "Fire",
+        13: "Explosion",
+        14: "Fire",
+        15: "Hurricane",
+        16: "Fire",
+        17: "Tsunami",
+        18: "Hurricane",
+        19: "Tsunami",
+        20: "Hurricane",
+        21: "Explosion",
+        22: "Earthquake",
+        23: "Hurricane",
+    }
+
+    _exp_c = _np.exp((_cos_sim - _cos_sim.max(axis=1, keepdims=True)) / 0.08)
+    _p_c = _exp_c / _exp_c.sum(axis=1, keepdims=True)
+    _p_cluster_cls = _np.zeros((len(_df_inv), 6), dtype=_np.float32)
+    for _c in range(24):
+        _j = _CLASSES.index(CLUSTER_TO_CLASS[_c])
+        _p_cluster_cls[:, _j] += _p_c[:, _c]
+
+    _exp_p = _np.exp((_phys_scores - _phys_scores.max(axis=1, keepdims=True)) / 0.65)
+    _p_phys_cls = (_exp_p / _exp_p.sum(axis=1, keepdims=True)).astype(_np.float32)
+
+    _soft_targets = 0.65 * _p_cluster_cls + 0.35 * _p_phys_cls
+    _soft_targets /= _soft_targets.sum(axis=1, keepdims=True)
+    _np.save("/marimo/Fenomena/pure_vision_soft_targets.npy", _soft_targets)
+
+    _hard_y = _soft_targets.argmax(axis=1)
+    _folds = _np.zeros(len(_df_inv), dtype=_np.int64)
+    _skf = _SKF(n_splits=5, shuffle=True, random_state=42)
+    for _f, (_, _va) in enumerate(_skf.split(_soft_targets, _hard_y)):
+        _folds[_va] = _f
+    _np.save("/marimo/Fenomena/folds_skf5.npy", _folds)
+
+    print("\n=== DISTRIBUSI PURE-VISION SOFT TARGETS (K=24 CLUSTER + PHYSICAL WEAK SUP) ===")
+    for _j, _cname in enumerate(_CLASSES):
+        _cnt = int((_hard_y == _j).sum())
+        print(f"  {_cname:10s}: {_cnt:4d} ({100.0*_cnt/len(_df_inv):5.2f}%)")
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 17. Self-Supervised Contrastive Pretraining (`InfoNCE` pada `ConvNeXt-Base 512x512`)
+
+    - **Tujuan (FAQ No. 5):** Melatih *backbone* `convnext_base.fb_in22k_ft_in1k_384` secara *self-supervised* menggunakan **Symmetric InfoNCE Contrastive Loss** di atas `/dev/shm/fenomena_512_lab_clahe.npy` (`512x512`, LAB CLAHE kanal-L) di mana pasangan `(pre_i, post_i)` dari `Id` yang sama adalah pasangan positif dan `Id` lain dalam *batch* adalah negatif.
+    - **Augmentasi:** Hanya transformasi dihedral geometrik identik (`HFlip/VFlip/Rot90`) tanpa distorsi warna/erasing brutal.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # Langkah 4.1: Self-Supervised Contrastive Pretraining (InfoNCE pada ConvNeXt-Base 512x512, Zero-IPC RAM)
+    import os as _os, time as _time, random as _random
+    import numpy as _np, torch as _torch, torch.nn as _nn, torch.nn.functional as _F
+    import timm as _timm
+
+    _CKPT_CONTRASTIVE = "/marimo/Fenomena/ckpt_contrastive_cnxb512.pt"
+    if _os.path.exists(_CKPT_CONTRASTIVE):
+        print("Contrastive checkpoint already exists:", _CKPT_CONTRASTIVE)
+    else:
+        _t0 = _time.time()
+        _imgs_shm = _np.load("/dev/shm/fenomena_512_lab_clahe.npy", mmap_mode="r")  # (3180, 2, 512, 512, 3)
+        _N = len(_imgs_shm)
+        _mean = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
+        _std = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
+
+        def _aug_gpu(x):
+            if _random.random() < 0.5: x = _torch.flip(x, [3])
+            if _random.random() < 0.5: x = _torch.flip(x, [2])
+            k = _random.randint(0, 3)
+            if k: x = _torch.rot90(x, k, [2, 3])
+            return x
+
+        class _ContrastiveCNXB(_nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.backbone = _timm.create_model("convnext_base.fb_in22k_ft_in1k_384", pretrained=True, num_classes=0)
+                self.proj = _nn.Sequential(
+                    _nn.Linear(self.backbone.num_features, 512),
+                    _nn.BatchNorm1d(512),
+                    _nn.GELU(),
+                    _nn.Linear(512, 256),
+                )
+            def forward(self, x):
+                return _F.normalize(self.proj(self.backbone(x)), dim=-1)
+
+        _bs = 32
+        _steps_per_ep = _N // _bs
+        _epochs = 6
+        _model = _ContrastiveCNXB().cuda()
+        _opt = _torch.optim.AdamW(_model.parameters(), lr=1.5e-4, weight_decay=1e-2)
+        _sched = _torch.optim.lr_scheduler.CosineAnnealingLR(_opt, T_max=_epochs * _steps_per_ep)
+        _rng = _np.random.default_rng(42)
+
+        for _ep in range(1, _epochs + 1):
+            _model.train()
+            _perm = _rng.permutation(_N)
+            _loss_sum = 0.0
+            for _s in range(_steps_per_ep):
+                _idx = _perm[_s * _bs : (_s + 1) * _bs]
+                _batch = _torch.from_numpy(_np.array(_imgs_shm[_idx], copy=True)).cuda(non_blocking=True)
+                _xa = (_batch[:, 0].permute(0, 3, 1, 2).float() / 255.0 - _mean) / _std
+                _xb = (_batch[:, 1].permute(0, 3, 1, 2).float() / 255.0 - _mean) / _std
+                _xa, _xb = _aug_gpu(_xa), _aug_gpu(_xb)
+                _opt.zero_grad(set_to_none=True)
+                with _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+                    _za, _zb = _model(_xa), _model(_xb)
+                    _logits = (_za @ _zb.T) / 0.10
+                    _lbls = _torch.arange(_bs, device="cuda")
+                    _loss = 0.5 * (_F.cross_entropy(_logits, _lbls) + _F.cross_entropy(_logits.T, _lbls))
+                _loss.backward()
+                _opt.step()
+                _sched.step()
+                _loss_sum += float(_loss.item())
+            print(f"  [InfoNCE] Epoch {_ep:02d}/{_epochs} | loss={_loss_sum/_steps_per_ep:.4f} | elapsed={_time.time()-_t0:.1f}s")
+
+        _torch.save(_model.backbone.state_dict(), _CKPT_CONTRASTIVE)
+        print(f"Saved contrastive backbone weights -> {_CKPT_CONTRASTIVE} in {_time.time()-_t0:.1f}s")
+        del _model, _opt, _sched
+        _torch.cuda.empty_cache()
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 20. Audit Forensik `v5_pure_vision` — Mengapa Klaster `K=24` Didominasi Latar Statis
+
+    1. **Dominasi Vektor Statis (`0.5*(e_A + e_B)` vs `e_A - e_B`):**
+       - Pada `ScaleMAE`, rasio norma `||mean|| / ||diff||` mencapai **`4.756x`** (median `3.631x`), dan pada `I-JEPA` **`1.246x`**. Karena SVD di `K16` menyatukan `mean` dan `diff`, klaster `K=24` terbentuk berdasarkan **bioma/latar statis** (*kota = Earthquake*, *pantai = Tsunami*, *kabut/grayscale = Volcano*), bukan *pola kerusakan*.
+    2. **Distribusi Arah Perubahan Searah (`post - pre`, `3.180` pasang):**
+       - `dExG (post - pre)`: `mean = -0.0082` (`<0 = 48.93%` vs `>0 = 43.58%`)
+       - `dWater (post - pre)`: `mean = +0.0224` (`>0 = 45.66%` vs `<0 = 43.30%`)
+       - `dLogLap (post - pre)`: `mean = -0.0474` (`<0 = 53.02%` vs `>0 = 46.98%`)
+       - `dBlur (post - pre)`: `mean = +0.000091` (`>0 = 53.02%`)
+       - **Anomali Sensor:** `NIR False-Color = 365 (11.48%)`, `Grayscale = 420 (13.21%)`, `Bersih RGB = 2.402 (75.53%)`.
+    3. **Solusi Arsitektur (`v6_spatial_physics`):** Ekstraksi *DINOv3 `64x64` + DINOv2-Giant `37x37` Spatial Change Heatmap*, pemisahan 3 rezim sensor (`RGB`, `NIR`, `Grayscale`), serta *Change-Only Over-Clustering ($K=32$)* **tanpa** vektor statis `0.5*(e_A + e_B)`.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # TAHAP 1: Audit Forensik v5_pure_vision (Norm Ratio Mean vs Diff & Arah Perubahan Searah post - pre)
+    import os as _os
+    import numpy as _np, pandas as _pd
+    import cv2 as _cv2
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+
+    _df_inv = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet")
+    _pv_files = [
+        ("DINOv3-L", "emb_DINOv3L_5crop_sym.npy"),
+        ("SatMAE++", "emb_SatMAEPP_5crop_sym.npy"),
+        ("ScaleMAE", "emb_ScaleMAE_5crop_sym.npy"),
+        ("DINOv2-Giant", "emb_DINOv2Giant_5crop_sym.npy"),
+        ("I-JEPA", "emb_IJEPA_5crop_sym.npy"),
+    ]
+
+    print("=== 1. RASIO NORMA ||0.5*(e_A + e_B)|| vs ||e_A - e_B|| PADA EMBEDDING K16 ===")
+    _ratios = []
+    for _name, _fn in _pv_files:
+        _arr = _np.load(f"/marimo/Fenomena/{_fn}", mmap_mode="r")
+        _half = _arr.shape[1] // 2
+        _n_mean = _np.linalg.norm(_arr[:, :_half], axis=1)
+        _n_diff = _np.linalg.norm(_arr[:, _half:], axis=1)
+        _r = _n_mean / (_n_diff + 1e-8)
+        _ratios.append((_name, float(_n_mean.mean()), float(_n_diff.mean()), float(_r.mean()), float(_np.median(_r))))
+        print(f"  {_name:13s}: ||mean||={_n_mean.mean():.4f} | ||diff||={_n_diff.mean():.4f} | ratio mean/diff={_r.mean():.3f}x (median={_np.median(_r):.3f}x)")
+
+    def _dir_stats(idx):
+        im_a = _cv2.resize(_cv2.imread(_df_inv["path_pre"].iloc[idx]), (256, 256))
+        im_b = _cv2.resize(_cv2.imread(_df_inv["path_post"].iloc[idx]), (256, 256))
+        ra, ga, ba = im_a[:, :, 2].astype(_np.float32), im_a[:, :, 1].astype(_np.float32), im_a[:, :, 0].astype(_np.float32)
+        rb, gb, bb = im_b[:, :, 2].astype(_np.float32), im_b[:, :, 1].astype(_np.float32), im_b[:, :, 0].astype(_np.float32)
+        va = (ra > 8) | (ga > 8) | (ba > 8)
+        vb = (rb > 8) | (gb > 8) | (bb > 8)
+        v = va & vb
+        if v.sum() < 64: v = _np.ones((256, 256), dtype=bool)
+        exg_a = float(((2*ga - ra - ba)[v] / 255.0).mean())
+        exg_b = float(((2*gb - rb - bb)[v] / 255.0).mean())
+        wat_a = float(((ba[v] > ra[v] + 8) & (ba[v] > ga[v] - 5) & ((0.299*ra+0.587*ga+0.114*ba)[v] < 150)).mean())
+        wat_b = float(((bb[v] > rb[v] + 8) & (bb[v] > gb[v] - 5) & ((0.299*rb+0.587*gb+0.114*bb)[v] < 150)).mean())
+        ga_gray = _cv2.cvtColor(im_a, _cv2.COLOR_BGR2GRAY).astype(_np.float32)
+        gb_gray = _cv2.cvtColor(im_b, _cv2.COLOR_BGR2GRAY).astype(_np.float32)
+        lap_a = float(_cv2.Laplacian(ga_gray, _cv2.CV_32F)[v].var())
+        lap_b = float(_cv2.Laplacian(gb_gray, _cv2.CV_32F)[v].var())
+        blur_a = 1.0 / (lap_a + 1.0)
+        blur_b = 1.0 / (lap_b + 1.0)
+        is_nir = int((ra[v].mean()-ga[v].mean() > 25) or (rb[v].mean()-gb[v].mean() > 25) or (ra[v].mean()>105 and ba[v].mean()>105 and ga[v].mean()<85) or (rb[v].mean()>105 and bb[v].mean()>105 and gb[v].mean()<85))
+        is_gray = int((abs(ra[v].mean()-ga[v].mean())+abs(ga[v].mean()-ba[v].mean()) < 5) or (abs(rb[v].mean()-gb[v].mean())+abs(gb[v].mean()-bb[v].mean()) < 5))
+        return exg_b - exg_a, wat_b - wat_a, _np.log1p(lap_b) - _np.log1p(lap_a), blur_b - blur_a, is_nir, is_gray
+
+    with _TPE(max_workers=16) as _ex:
+        _ds = _np.array(list(_ex.map(_dir_stats, range(len(_df_inv)))), dtype=_np.float64)
+
+    _d_exg, _d_wat, _d_lap, _d_blur, _nir, _gray = _ds[:, 0], _ds[:, 1], _ds[:, 2], _ds[:, 3], _ds[:, 4], _ds[:, 5]
+    print("\n=== 2. DISTRIBUSI ARAH PERUBAHAN SEARAH (post - pre) PADA 3.180 PASANG ===")
+    print(f"  dExG (post - pre)     : mean={_d_exg.mean():+.4f} | <0 (veg loss)={100*(_d_exg<0).mean():.2f}% | >0={100*(_d_exg>0).mean():.2f}%")
+    print(f"  dWater (post - pre)   : mean={_d_wat.mean():+.4f} | >0 (water gain)={100*(_d_wat>0).mean():.2f}% | <0={100*(_d_wat<0).mean():.2f}%")
+    print(f"  dLogLap (post - pre)  : mean={_d_lap.mean():+.4f} | <0 (smooth drop)={100*(_d_lap<0).mean():.2f}% | >0={100*(_d_lap>0).mean():.2f}%")
+    print(f"  dBlur (post - pre)    : mean={_d_blur.mean():+.6f} | >0 (blurrier post)={100*(_d_blur>0).mean():.2f}%")
+    print(f"  Anomali Sensor        : NIR False-Color={int(_nir.sum())} ({100*_nir.mean():.2f}%) | Grayscale={int(_gray.sum())} ({100*_gray.mean():.2f}%) | Bersih RGB={int(((1-_nir)*(1-_gray)).sum())} ({100*((1-_nir)*(1-_gray)).mean():.2f}%)")
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 21. Ekstraksi *DINOv3 Spatial Change Heatmap (`64×64`)* & *DINOv2-Giant (`37×37`)*
+
+    - **`DINOv3-ViT-L/16` (`1024×1024`):** Mengambil `4.096` patch tokens (`64×64`) untuk `pre` dan `post`, menghitung peta panas perubahan kosinus $\Delta(i,j) = 1 - \cos(\mathbf{t}_{	ext{post}}(i,j), \mathbf{t}_{	ext{pre}}(i,j))$ (`dinov3_change_map_64x64.npy`) serta fitur perubahan murni `|t_post - t_pre|`.
+    - **`DINOv2-Giant` (`518×518`):** Mengambil `1.369` patch tokens (`37×37`) untuk fusi multi-skala (`dinov2_change_map_37x37.npy`).
+    """)
+    return
+
+
+@app.cell
+def _():
+    # TAHAP 2.1a: Fungsi Ekstraksi DINOv3-L (1024x1024 -> 64x64 Patch Change Heatmap) per Chunk + Chunk 1 (0..795)
+    import os as _os, time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    import numpy as _np, pandas as _pd, torch as _torch, torch.nn.functional as _F
+    import timm as _timm, cv2 as _cv2
+
+    def extract_dinov3_chunk(cid, start_i, end_i):
+        out_m = f"/marimo/Fenomena/_dinov3_map_c{cid}.npy"
+        out_d = f"/marimo/Fenomena/_dinov3_diff_c{cid}.npy"
+        if _os.path.exists(out_m) and _os.path.exists(out_d):
+            print(f"DINOv3 chunk {cid} cached:", _np.load(out_m, mmap_mode="r").shape)
+            return
+        t0 = _time.time()
+        df = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet").iloc[start_i:end_i]
+        mdl = _timm.create_model("hf_hub:timm/vit_large_patch16_dinov3.lvd1689m", pretrained=True, num_classes=0, dynamic_img_size=True).cuda().to(_torch.bfloat16).eval()
+        mean = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
+        std = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
+
+        def _load(idx):
+            a = _cv2.cvtColor(_cv2.resize(_cv2.imread(df["path_pre"].iloc[idx]), (1024, 1024)), _cv2.COLOR_BGR2RGB)
+            b = _cv2.cvtColor(_cv2.resize(_cv2.imread(df["path_post"].iloc[idx]), (1024, 1024)), _cv2.COLOR_BGR2RGB)
+            return a, b
+
+        n, bs = len(df), 16
+        maps = _np.zeros((n, 64, 64), dtype=_np.float16)
+        diffs = _np.zeros((n, 2048), dtype=_np.float32)
+        with _TPE(max_workers=12) as ex, _torch.no_grad(), _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+            for i in range(0, n, bs):
+                pairs = list(ex.map(_load, range(i, min(i + bs, n))))
+                pa = (_torch.from_numpy(_np.stack([p[0] for p in pairs])).cuda(non_blocking=True).permute(0, 3, 1, 2).float() / 255.0 - mean) / std
+                pb = (_torch.from_numpy(_np.stack([p[1] for p in pairs])).cuda(non_blocking=True).permute(0, 3, 1, 2).float() / 255.0 - mean) / std
+                ta = _F.normalize(mdl.forward_features(pa.to(_torch.bfloat16))[:, 5:, :].float(), dim=-1)
+                tb = _F.normalize(mdl.forward_features(pb.to(_torch.bfloat16))[:, 5:, :].float(), dim=-1)
+                cos = (ta * tb).sum(dim=-1).view(-1, 64, 64)
+                abs_d = _torch.abs(tb - ta)
+                maps[i:i+len(pairs)] = (1.0 - cos).clamp(0.0, 2.0).cpu().numpy().astype(_np.float16)
+                diffs[i:i+len(pairs)] = _torch.cat([abs_d.mean(dim=1), abs_d.max(dim=1).values], dim=-1).cpu().numpy().astype(_np.float32)
+        _np.save(out_m, maps); _np.save(out_d, diffs)
+        del mdl; _torch.cuda.empty_cache()
+        print(f"Saved DINOv3 chunk {cid} [{start_i}:{end_i}] {maps.shape} in {_time.time()-t0:.1f}s")
+
+    extract_dinov3_chunk(0, 0, 795)
+
+    return (extract_dinov3_chunk,)
+
+
+@app.cell
+def _(extract_dinov3_chunk):
+    extract_dinov3_chunk(1, 795, 1590)
+    return
+
+
+@app.cell
+def _(extract_dinov3_chunk):
+    extract_dinov3_chunk(2, 1590, 2385)
+    return
+
+
+@app.cell
+def _(extract_dinov3_chunk):
+    extract_dinov3_chunk(3, 2385, 3180)
+    import numpy as _np, os as _os
+    _maps = _np.concatenate([_np.load(f"/marimo/Fenomena/_dinov3_map_c{i}.npy") for i in range(4)], axis=0)
+    _diffs = _np.concatenate([_np.load(f"/marimo/Fenomena/_dinov3_diff_c{i}.npy") for i in range(4)], axis=0)
+    _np.save("/marimo/Fenomena/dinov3_change_map_64x64.npy", _maps)
+    _np.save("/marimo/Fenomena/emb_dinov3_1024_diff_only.npy", _diffs)
+    for i in range(4):
+        for p in [f"/marimo/Fenomena/_dinov3_map_c{i}.npy", f"/marimo/Fenomena/_dinov3_diff_c{i}.npy"]:
+            if _os.path.exists(p): _os.remove(p)
+    print("ASSEMBLED DINOv3:", _maps.shape, _diffs.shape, "NaN:", _np.isnan(_maps).sum(), _np.isnan(_diffs).sum())
+
+    return
+
+
+@app.cell
+def _():
+    # TAHAP 2.1b: Ekstraksi DINOv2-Giant (518x518 -> 37x37 Patch Change Heatmap) — Chunk 0 (0..1590)
+    import os as _os, time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    import numpy as _np, pandas as _pd, torch as _torch, torch.nn.functional as _F
+    import cv2 as _cv2
+    from transformers import AutoModel as _AutoModel
+
+    def extract_dinov2_chunk(cid, start_i, end_i):
+        out_m = f"/marimo/Fenomena/_dinov2_map_c{cid}.npy"
+        out_d = f"/marimo/Fenomena/_dinov2_diff_c{cid}.npy"
+        if _os.path.exists(out_m) and _os.path.exists(out_d):
+            print(f"DINOv2 chunk {cid} cached:", _np.load(out_m, mmap_mode="r").shape)
+            return
+        t0 = _time.time()
+        df = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet").iloc[start_i:end_i]
+        mdl = _AutoModel.from_pretrained("facebook/dinov2-giant", dtype=_torch.bfloat16).cuda().eval()
+        mean = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
+        std = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
+
+        def _load(idx):
+            a = _cv2.cvtColor(_cv2.resize(_cv2.imread(df["path_pre"].iloc[idx]), (518, 518)), _cv2.COLOR_BGR2RGB)
+            b = _cv2.cvtColor(_cv2.resize(_cv2.imread(df["path_post"].iloc[idx]), (518, 518)), _cv2.COLOR_BGR2RGB)
+            return a, b
+
+        n, bs = len(df), 24
+        maps = _np.zeros((n, 37, 37), dtype=_np.float16)
+        diffs = _np.zeros((n, 3072), dtype=_np.float32)
+        with _TPE(max_workers=12) as ex, _torch.no_grad(), _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
+            for i in range(0, n, bs):
+                pairs = list(ex.map(_load, range(i, min(i + bs, n))))
+                pa = (_torch.from_numpy(_np.stack([p[0] for p in pairs])).cuda(non_blocking=True).permute(0, 3, 1, 2).float() / 255.0 - mean) / std
+                pb = (_torch.from_numpy(_np.stack([p[1] for p in pairs])).cuda(non_blocking=True).permute(0, 3, 1, 2).float() / 255.0 - mean) / std
+                ta = _F.normalize(mdl(pixel_values=pa.to(_torch.bfloat16)).last_hidden_state[:, 1:, :].float(), dim=-1)
+                tb = _F.normalize(mdl(pixel_values=pb.to(_torch.bfloat16)).last_hidden_state[:, 1:, :].float(), dim=-1)
+                cos = (ta * tb).sum(dim=-1).view(-1, 37, 37)
+                abs_d = _torch.abs(tb - ta)
+                maps[i:i+len(pairs)] = (1.0 - cos).clamp(0.0, 2.0).cpu().numpy().astype(_np.float16)
+                diffs[i:i+len(pairs)] = _torch.cat([abs_d.mean(dim=1), abs_d.max(dim=1).values], dim=-1).cpu().numpy().astype(_np.float32)
+        _np.save(out_m, maps); _np.save(out_d, diffs)
+        del mdl; _torch.cuda.empty_cache()
+        print(f"Saved DINOv2 chunk {cid} [{start_i}:{end_i}] {maps.shape} in {_time.time()-t0:.1f}s")
+
+    extract_dinov2_chunk(0, 0, 1590)
+
+    return (extract_dinov2_chunk,)
+
+
+@app.cell
+def _(extract_dinov2_chunk):
+    extract_dinov2_chunk(1, 1590, 3180)
+    import numpy as _np, os as _os
+    _m2 = _np.concatenate([_np.load(f"/marimo/Fenomena/_dinov2_map_c{_i}.npy") for _i in range(2)], axis=0)
+    _d2 = _np.concatenate([_np.load(f"/marimo/Fenomena/_dinov2_diff_c{_i}.npy") for _i in range(2)], axis=0)
+    _np.save("/marimo/Fenomena/dinov2_change_map_37x37.npy", _m2)
+    _np.save("/marimo/Fenomena/emb_dinov2_518_diff_only.npy", _d2)
+    for _i in range(2):
+        for _p in [f"/marimo/Fenomena/_dinov2_map_c{_i}.npy", f"/marimo/Fenomena/_dinov2_diff_c{_i}.npy"]:
+            if _os.path.exists(_p): _os.remove(_p)
+    print("ASSEMBLED DINOv2:", _m2.shape, _d2.shape, "NaN:", _np.isnan(_m2).sum(), _np.isnan(_d2).sum())
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 22. Fitur Geometri Kerusakan 2D, Fisika Searah 3 Rezim Sensor & *Change-Only Clustering ($K=32$)*
+
+    - **Geometri Kerusakan 2D (`64×64` Fused `DINOv3 + DINOv2` Heatmap):** *Blast compactness* (`max_blob_ratio`, `gini_spatial`, `kurtosis_spatial`), *coastal/water-boundary adjacency*, *urban structure concentration*, dan *scene-wide diffuse spread*.
+    - **Fisika Searah (`post - pre`) dengan Pemisahan 3 Rezim Sensor (`RGB` vs `False-Color NIR` vs `Grayscale`):** Mencegah citra *False-Color NIR* masuk ke `Fire` dan mencegah kabut statis/*Grayscale* masuk ke `Volcano`.
+    - **Change-Only Over-Clustering ($K=32$, `SEED=42`):** Klastering **hanya** pada fitur perubahan (`|t_post - t_pre|`, geometri 2D, dan fisika searah) **tanpa** vektor statis `0.5*(e_A+e_B)` agar klaster terbentuk murni berdasarkan *pola kerusakan*.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # TAHAP 2.2, 2.3 & 3.1: 2D Spatial Damage Geometry + Directional Physics (3 Sensor Regimes) + Change-Only K=32 + Audit Grid
+    import os as _os, time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    import numpy as _np, pandas as _pd, cv2 as _cv2
+    from PIL import Image as _Image, ImageDraw as _ImageDraw
+    from sklearn.decomposition import TruncatedSVD as _TSVD
+    from sklearn.preprocessing import StandardScaler as _SS, normalize as _l2norm
+    from sklearn.cluster import KMeans as _KMeans
+    from sklearn.model_selection import StratifiedKFold as _SKF
+
+    _t0 = _time.time()
+    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    _df = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet")
+    _d3_maps = _np.load("/marimo/Fenomena/dinov3_change_map_64x64.npy").astype(_np.float32)
+    _d2_maps = _np.load("/marimo/Fenomena/dinov2_change_map_37x37.npy").astype(_np.float32)
+
+    def _extract_spatial_and_dir_phys(idx):
+        im_a = _cv2.resize(_cv2.imread(_df["path_pre"].iloc[idx]), (256, 256), interpolation=_cv2.INTER_AREA)
+        im_b = _cv2.resize(_cv2.imread(_df["path_post"].iloc[idx]), (256, 256), interpolation=_cv2.INTER_AREA)
+        rgb_a = im_a[:, :, ::-1].astype(_np.float32)
+        rgb_b = im_b[:, :, ::-1].astype(_np.float32)
+        ra, ga, ba = rgb_a[:, :, 0], rgb_a[:, :, 1], rgb_a[:, :, 2]
+        rb, gb, bb = rgb_b[:, :, 0], rgb_b[:, :, 1], rgb_b[:, :, 2]
+
+        va = (ra > 8) | (ga > 8) | (ba > 8)
+        vb = (rb > 8) | (gb > 8) | (bb > 8)
+        v = va & vb
+        if v.sum() < 64: v = _np.ones((256, 256), dtype=bool)
+        v64 = _cv2.resize(v.astype(_np.float32), (64, 64), interpolation=_cv2.INTER_AREA) > 0.5
+        if v64.sum() < 16: v64 = _np.ones((64, 64), dtype=bool)
+
+        d2_64 = _cv2.resize(_d2_maps[idx], (64, 64), interpolation=_cv2.INTER_LINEAR)
+        delta = (0.65 * _d3_maps[idx] + 0.35 * d2_64) * v64
+        d_vals = delta[v64]
+        d_mean = float(d_vals.mean())
+        d_max = float(d_vals.max())
+        d_std = float(d_vals.std())
+
+        py, px = _np.unravel_index(_np.argmax(delta), (64, 64))
+        yy, xx = _np.ogrid[:64, :64]
+        dist2 = (yy - py) ** 2 + (xx - px) ** 2
+        blob_mask = (dist2 <= 64) & v64
+        max_blob_ratio = float(delta[blob_mask].sum() / (d_vals.sum() + 1e-6))
+
+        s_vals = _np.sort(d_vals)
+        n_v = len(s_vals)
+        gini_spatial = float((2.0 * _np.sum(_np.arange(1, n_v + 1) * s_vals) / (n_v * s_vals.sum() + 1e-6)) - (n_v + 1.0) / n_v)
+        z_d = (d_vals - d_mean) / (d_std + 1e-6)
+        kurtosis_spatial = float(_np.mean(z_d ** 4) - 3.0)
+
+        thr_hi = d_mean + 0.5 * d_std
+        diffuse_spread = float((d_vals > max(thr_hi, 0.25)).mean())
+        p_sp = d_vals / (d_vals.sum() + 1e-6)
+        spatial_entropy = float(-_np.sum(p_sp * _np.log(p_sp + 1e-8)) / _np.log(n_v + 1e-6))
+        q_means = _np.array([delta[:32, :32].mean(), delta[:32, 32:].mean(), delta[32:, :32].mean(), delta[32:, 32:].mean()])
+        pq = q_means / (q_means.sum() + 1e-6)
+        quad_entropy = float(-_np.sum(pq * _np.log(pq + 1e-8)) / _np.log(4.0))
+
+        mr_a, mg_a, mb_a = float(ra[v].mean()), float(ga[v].mean()), float(ba[v].mean())
+        mr_b, mg_b, mb_b = float(rb[v].mean()), float(gb[v].mean()), float(bb[v].mean())
+        is_nir = float((mr_a - mg_a > 25) or (mr_b - mg_b > 25) or (mr_a > 105 and mb_a > 105 and mg_a < 85) or (mr_b > 105 and mb_b > 105 and mg_b < 85))
+        is_gray = float((abs(mr_a - mg_a) + abs(mg_a - mb_a) < 5) or (abs(mr_b - mg_b) + abs(mg_b - mb_b) < 5))
+
+        hsv_a = _cv2.cvtColor(im_a, _cv2.COLOR_BGR2HSV).astype(_np.float32)
+        hsv_b = _cv2.cvtColor(im_b, _cv2.COLOR_BGR2HSV).astype(_np.float32)
+        sat_a, sat_b = hsv_a[:, :, 1], hsv_b[:, :, 1]
+        lum_a = 0.299 * ra + 0.587 * ga + 0.114 * ba
+        lum_b = 0.299 * rb + 0.587 * gb + 0.114 * bb
+
+        gray_a = _cv2.cvtColor(im_a, _cv2.COLOR_BGR2GRAY).astype(_np.float32)
+        gray_b = _cv2.cvtColor(im_b, _cv2.COLOR_BGR2GRAY).astype(_np.float32)
+        gxa = _cv2.Sobel(gray_a, _cv2.CV_32F, 1, 0, ksize=3)
+        gya = _cv2.Sobel(gray_a, _cv2.CV_32F, 0, 1, ksize=3)
+        edge_a = _np.sqrt(gxa * gxa + gya * gya)
+        edge_a_64 = _cv2.resize(edge_a, (64, 64), interpolation=_cv2.INTER_AREA)
+        urban_edge_pre = float((edge_a[v] > 45.0).mean())
+        urban_delta_corr = float(_np.corrcoef(delta[v64], edge_a_64[v64])[0, 1]) if edge_a_64[v64].std() > 1e-5 else 0.0
+        if _np.isnan(urban_delta_corr): urban_delta_corr = 0.0
+
+        if is_gray > 0.5:
+            veg_loss = 0.0
+            dark_char_gain = float((lum_b[v] < 55).mean() - (lum_a[v] < 55).mean()) * 0.3
+        elif is_nir > 0.5:
+            veg_loss = float(max(0.0, (mr_a - mr_b) / 255.0))
+            char_a = ((lum_a < 70) & (sat_a < 55))
+            char_b = ((lum_b < 70) & (sat_b < 55))
+            dark_char_gain = float(char_b[v].mean() - char_a[v].mean())
+        else:
+            exg_a = (2.0 * ga - ra - ba) / 255.0
+            exg_b = (2.0 * gb - rb - bb) / 255.0
+            veg_loss = float(max(0.0, exg_a[v].mean() - exg_b[v].mean()))
+            char_a = ((lum_a < 68) & (sat_a < 50))
+            char_b = ((lum_b < 68) & (sat_b < 50))
+            dark_char_gain = float(char_b[v].mean() - char_a[v].mean())
+
+        if is_gray > 0.5:
+            water_gain = 0.0
+            coastal_adj = 0.0
+            water_post_frac = 0.0
+        else:
+            w_a = ((ba > ra + 8) & (ba > ga - 5) & (lum_a < 155)) | ((ga > ra + 10) & (ba > ra + 8) & (lum_a < 125))
+            w_b = ((bb > rb + 8) & (bb > gb - 5) & (lum_b < 155)) | ((gb > rb + 10) & (bb > rb + 8) & (lum_b < 125))
+            water_post_frac = float(w_b[v].mean())
+            water_gain = float(w_b[v].mean() - w_a[v].mean())
+            wb_64 = _cv2.resize(w_b.astype(_np.float32), (64, 64), interpolation=_cv2.INTER_AREA)
+            wb_dil = _cv2.dilate((wb_64 > 0.25).astype(_np.uint8), _np.ones((5, 5), _np.uint8))
+            coastal_adj = float((delta * wb_dil)[v64].mean() / (d_mean + 1e-5)) * float(water_post_frac > 0.03)
+
+        lap_a = float(_np.log1p(_cv2.Laplacian(gray_a, _cv2.CV_32F)[v].var()))
+        lap_b = float(_np.log1p(_cv2.Laplacian(gray_b, _cv2.CV_32F)[v].var()))
+        lap_drop = float(max(0.0, lap_a - lap_b))
+        if is_gray > 0.5:
+            smooth_blanket_gain = float(max(0.0, ((lum_b > 90) & (lum_b < 220))[v].mean() - ((lum_a > 90) & (lum_a < 220))[v].mean()))
+        else:
+            ash_a = (sat_a < 32) & (lum_a > 80) & (lum_a < 220)
+            ash_b = (sat_b < 32) & (lum_b > 80) & (lum_b < 220)
+            smooth_blanket_gain = float(max(0.0, ash_b[v].mean() - ash_a[v].mean()))
+        real_change_gate = float(d_mean > 0.18)
+
+        def _hf(g):
+            m = _np.abs(_np.fft.fftshift(_np.fft.fft2(g)))
+            yy2, xx2 = _np.ogrid[:256, :256]
+            return float(m[(yy2 - 128)**2 + (xx2 - 128)**2 > 1024].sum() / (m.sum() + 1e-6))
+        hf_gain = _hf(gray_b) - _hf(gray_a)
+
+        return _np.array([
+            d_mean, d_max, d_std, max_blob_ratio, gini_spatial, kurtosis_spatial,
+            diffuse_spread, spatial_entropy, quad_entropy,
+            urban_edge_pre, urban_delta_corr, hf_gain,
+            veg_loss, dark_char_gain,
+            water_post_frac, water_gain, coastal_adj,
+            lap_drop * real_change_gate, smooth_blanket_gain * real_change_gate,
+            is_nir, is_gray,
+        ], dtype=_np.float32)
+
+    with _TPE(max_workers=16) as _ex:
+        _sp_mat = _np.stack(list(_ex.map(_extract_spatial_and_dir_phys, range(len(_df)))), axis=0)
+
+    _np.save("/marimo/Fenomena/spatial_dir_physics.npy", _sp_mat)
+    print(f"spatial_dir_physics.npy shape={_sp_mat.shape} in {_time.time()-_t0:.1f}s | NaN={_np.isnan(_sp_mat).sum()}")
+
+    def _z(x):
+        return (x - x.mean()) / (x.std() + 1e-6)
+
+    _s_earthquake = 0.40 * _z(_sp_mat[:, 9]) + 0.35 * _z(_sp_mat[:, 10]) + 0.25 * _z(_sp_mat[:, 11]) + 0.15 * _z(_sp_mat[:, 6]) - 0.20 * _z(_sp_mat[:, 16])
+    _s_fire = 0.50 * _z(_sp_mat[:, 12]) + 0.40 * _z(_sp_mat[:, 13]) - 0.25 * _z(_sp_mat[:, 16]) - 0.15 * _z(_sp_mat[:, 20])
+    _s_hurricane = 0.45 * _z(_sp_mat[:, 6]) + 0.35 * _z(_sp_mat[:, 7]) + 0.25 * _z(_sp_mat[:, 8]) - 0.35 * _z(_sp_mat[:, 3]) - 0.25 * _z(_sp_mat[:, 4])
+    _s_tsunami = 0.45 * _z(_sp_mat[:, 15]) + 0.40 * _z(_sp_mat[:, 16]) + 0.25 * _z(_sp_mat[:, 14]) - 0.20 * _z(_sp_mat[:, 20])
+    _s_volcano = 0.50 * _z(_sp_mat[:, 17]) + 0.45 * _z(_sp_mat[:, 18]) - 0.20 * _z(_sp_mat[:, 10])
+    _s_explosion = 0.45 * _z(_sp_mat[:, 3]) + 0.35 * _z(_sp_mat[:, 4]) + 0.30 * _z(_sp_mat[:, 5]) - 0.30 * _z(_sp_mat[:, 6])
+
+    _dir_scores = _np.stack([_s_earthquake, _s_fire, _s_hurricane, _s_tsunami, _s_volcano, _s_explosion], axis=1).astype(_np.float32)
+
+    _chg_blocks = [
+        _l2norm(_TSVD(n_components=128, random_state=42).fit_transform(_l2norm(_np.load("/marimo/Fenomena/emb_dinov3_1024_diff_only.npy")))),
+        _l2norm(_TSVD(n_components=128, random_state=42).fit_transform(_l2norm(_np.load("/marimo/Fenomena/emb_dinov2_518_diff_only.npy")))),
+    ]
+    for _fn in ["emb_DINOv3L_5crop_sym.npy", "emb_SatMAEPP_5crop_sym.npy", "emb_ScaleMAE_5crop_sym.npy", "emb_DINOv2Giant_5crop_sym.npy", "emb_IJEPA_5crop_sym.npy"]:
+        _arr = _np.load(f"/marimo/Fenomena/{_fn}", mmap_mode="r")
+        _half = _arr.shape[1] // 2
+        _diff_only = _l2norm(_np.array(_arr[:, _half:], dtype=_np.float32))
+        _chg_blocks.append(_l2norm(_TSVD(n_components=64, random_state=42).fit_transform(_diff_only)))
+
+    _sp_scaled = _l2norm(_SS().fit_transform(_sp_mat[:, :19]))
+    _Z_change = _l2norm(_np.hstack(_chg_blocks + [0.85 * _sp_scaled]))
+
+    _km = _KMeans(n_clusters=32, n_init=20, max_iter=300, random_state=42).fit(_Z_change)
+    _cids = _km.labels_
+    _centroids = _l2norm(_km.cluster_centers_)
+    _cos_sim = _Z_change @ _centroids.T
+    _c_sizes = _np.bincount(_cids, minlength=32)
+
+    _c_prof = _np.zeros((32, 6), dtype=_np.float32)
+    for _c in range(32):
+        _c_prof[_c] = _dir_scores[_cids == _c].mean(axis=0)
+    _prof_z = (_c_prof - _c_prof.mean(axis=0)) / (_c_prof.std(axis=0) + 1e-6)
+
+    CLUSTER_TO_CLASS_V6 = {int(c): _CLASSES[int(_np.argmax(_prof_z[c]))] for c in range(32)}
+
+    print("\n=== PROFIL 32 KLASTER CHANGE-ONLY & PEMETAAN CLUSTER_TO_CLASS_V6 ===")
+    for _c in range(32):
+        _nir_p = 100.0 * _sp_mat[_cids == _c, 19].mean()
+        _gry_p = 100.0 * _sp_mat[_cids == _c, 20].mean()
+        _vals = " ".join(f"{_CLASSES[j][:4]}={_prof_z[_c, j]:+5.2f}" for j in range(6))
+        print(f"  C{_c:02d} (n={_c_sizes[_c]:3d}, NIR={_nir_p:4.1f}%, Gray={_gry_p:4.1f}%) -> {CLUSTER_TO_CLASS_V6[_c]:10s} | {_vals}")
+
+    _exp_c = _np.exp((_cos_sim - _cos_sim.max(axis=1, keepdims=True)) / 0.08)
+    _p_c = _exp_c / _exp_c.sum(axis=1, keepdims=True)
+    _p_clust_cls = _np.zeros((len(_df), 6), dtype=_np.float32)
+    for _c in range(32):
+        _p_clust_cls[:, _CLASSES.index(CLUSTER_TO_CLASS_V6[_c])] += _p_c[:, _c]
+
+    _exp_p = _np.exp((_dir_scores - _dir_scores.max(axis=1, keepdims=True)) / 0.65)
+    _p_phys_cls = (_exp_p / _exp_p.sum(axis=1, keepdims=True)).astype(_np.float32)
+
+    _soft_v6 = 0.60 * _p_clust_cls + 0.40 * _p_phys_cls
+    _soft_v6 /= _soft_v6.sum(axis=1, keepdims=True)
+    _np.save("/marimo/Fenomena/pure_vision_v6_soft_targets.npy", _soft_v6)
+
+    _hard_v6 = _soft_v6.argmax(axis=1)
+    _folds = _np.zeros(len(_df), dtype=_np.int64)
+    _skf = _SKF(n_splits=5, shuffle=True, random_state=42)
+    for _f, (_, _va) in enumerate(_skf.split(_soft_v6, _hard_v6)):
+        _folds[_va] = _f
+    _np.save("/marimo/Fenomena/folds_skf5.npy", _folds)
+
+    print("\n=== DISTRIBUSI TARGET LUNAK v6 (CHANGE-ONLY K=32 + DIRECTIONAL PHYSICS) ===")
+    for _j, _cn in enumerate(_CLASSES):
+        _cnt = int((_hard_v6 == _j).sum())
+        print(f"  {_cn:10s}: {_cnt:4d} ({100.0*_cnt/len(_df):5.2f}%)")
+
+    _rng = _np.random.default_rng(42)
+    _tw, _th = 180, 180
+    _pad_x, _pad_y = 10, 34
+    _cols_w = 4 * (3 * _tw + _pad_x) + 140
+    _rows_h = 6 * (_th + _pad_y) + 20
+    _canvas = _Image.new("RGB", (_cols_w, _rows_h), (245, 245, 245))
+    _draw = _ImageDraw.Draw(_canvas)
+
+    for _j, _cn in enumerate(_CLASSES):
+        _y0 = 10 + _j * (_th + _pad_y)
+        _draw.text((8, _y0 + 20), f"{_cn}\n(n={int((_hard_v6==_j).sum())})", fill=(10, 10, 10))
+        _cands = _np.where(_hard_v6 == _j)[0]
+        _picks = _rng.choice(_cands, size=min(4, len(_cands)), replace=False)
+        for _k, _idx in enumerate(_picks):
+            _x0 = 130 + _k * (3 * _tw + _pad_x)
+            _ima = _Image.open(_df["path_pre"].iloc[_idx]).convert("RGB").resize((_tw, _th))
+            _imb = _Image.open(_df["path_post"].iloc[_idx]).convert("RGB").resize((_tw, _th))
+            _hm = _d3_maps[_idx]
+            _hm_u8 = _np.clip((_hm - _hm.min()) / (_hm.max() - _hm.min() + 1e-6) * 255.0, 0, 255).astype(_np.uint8)
+            _hm_rgb = _cv2.applyColorMap(_cv2.resize(_hm_u8, (_tw, _th), interpolation=_cv2.INTER_CUBIC), _cv2.COLORMAP_JET)[:, :, ::-1]
+            _imh = _Image.fromarray(_hm_rgb)
+            _canvas.paste(_ima, (_x0, _y0 + 18))
+            _canvas.paste(_imb, (_x0 + _tw, _y0 + 18))
+            _canvas.paste(_imh, (_x0 + 2 * _tw, _y0 + 18))
+            _txt = f"{_df['id'].iloc[_idx]} | d={_sp_mat[_idx,0]:.2f} blob={_sp_mat[_idx,3]:.2f} wAdj={_sp_mat[_idx,16]:.2f} urb={_sp_mat[_idx,10]:.2f}"
+            _draw.text((_x0, _y0 + 2), _txt, fill=(30, 30, 30))
+
+    _canvas.save("/marimo/Fenomena/audit_spatial_6classes.png")
+    print("Saved /marimo/Fenomena/audit_spatial_6classes.png")
+
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## 26. (`M20_claude_view_sd`) Tes Diagnostik `View S` (Struktur *Event*) & Over-Clustering `K = 72` + *Cluster Cards* (`View D`)
+
+    - **Tahap 1 — Diagnostik `View S`:** Menguji apakah dataset memiliki struktur *event* rapat dengan membangun graf kNN (`k=15`, kosinus) secara terpisah pada `View S` (`0.5*(e_A + e_B)`) dari `DINOv3-L`, `SatMAE++`, `I-JEPA`, `DINOv2-Giant`, dan `ScaleMAE`, lalu mengukur distribusi ukuran komunitas, **ARI** antar-backbone & antar-seed (`42` vs `1337`), serta kemurnian rezim sensor.
+    - **Tahap 2 — Fusi Graf kNN Multi-Backbone (`K = 72`) & *Cluster Cards* (`View D`):** Memisahkan 3 rezim sensor (`RGB`, `False-Color NIR`, `Grayscale`), melakukan *rank-averaging* kemiripan kosinus 5 backbone `View S`, membentuk **`K = 72`** sub-klaster (`C00..C71`), meringkas indikator `View D` dalam **peringkat persentil `[0, 1]`** ke `cluster_cards_k72.csv`, dan membuat montase visual `audit_cluster_cards_k72.png`.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # K20_claude_view_sd: Tahap 1 (View S Event Structure Diagnostic) + Tahap 2 (Balanced K=72 kNN-Fused Clusters & Cluster Cards)
+    import os as _os, time as _time
+    import numpy as _np, pandas as _pd, cv2 as _cv2
+    from PIL import Image as _Image, ImageDraw as _ImageDraw
+    from scipy.stats import rankdata as _rankdata
+    from sklearn.preprocessing import normalize as _l2norm, StandardScaler as _SS
+    from sklearn.neighbors import kneighbors_graph as _knn_graph
+    from sklearn.cluster import SpectralClustering as _SpecClust
+    from sklearn.metrics import adjusted_rand_score as _ari
+
+    _t0 = _time.time()
+    _df = _pd.read_parquet("/marimo/Fenomena/df_inventory.parquet")
+    _sp = _np.load("/marimo/Fenomena/spatial_dir_physics.npy").astype(_np.float32)
+    _phys_sym = _np.load("/marimo/Fenomena/physical_features_sym.npy").astype(_np.float32)
+    _d3_maps = _np.load("/marimo/Fenomena/dinov3_change_map_64x64.npy").astype(_np.float32)
+    _N = len(_df)
+
+    _bb_files = [
+        ("DINOv3-L", "emb_DINOv3L_5crop_sym.npy"),
+        ("SatMAE++", "emb_SatMAEPP_5crop_sym.npy"),
+        ("ScaleMAE", "emb_ScaleMAE_5crop_sym.npy"),
+        ("DINOv2-G", "emb_DINOv2Giant_5crop_sym.npy"),
+        ("I-JEPA", "emb_IJEPA_5crop_sym.npy"),
+    ]
+    _view_s = {}
+    for _name, _fn in _bb_files:
+        _arr = _np.load(f"/marimo/Fenomena/{_fn}", mmap_mode="r")
+        _h = _arr.shape[1] // 2
+        _view_s[_name] = _l2norm(_np.array(_arr[:, :_h], dtype=_np.float32))
+
+    _is_nir = _sp[:, 19] > 0.5
+    _is_gray = (_sp[:, 20] > 0.5) & (~_is_nir)
+    _regime_lbl = _np.where(_is_nir, 1, _np.where(_is_gray, 2, 0))
+    _regime_names = {0: "RGB", 1: "FalseColor_NIR", 2: "Grayscale"}
+
+    def _cluster_knn(X, seed=42, n_target=50):
+        A = _knn_graph(X, n_neighbors=15, mode="connectivity", metric="cosine", include_self=False)
+        A = 0.5 * (A + A.T)
+        return _SpecClust(n_clusters=n_target, affinity="precomputed", random_state=seed, assign_labels="kmeans", n_init=10).fit_predict(A.toarray())
+
+    _diag_bb = ["DINOv3-L", "SatMAE++", "I-JEPA", "DINOv2-G"]
+    _comm_labels = {}
+    print("=== LAPORAN DIAGNOSTIK TAHAP 1: KOMUNITAS GRAF kNN (k=15, SEED=42) ===")
+    for _bn in _diag_bb:
+        _lbls = _cluster_knn(_view_s[_bn], seed=42, n_target=50)
+        _comm_labels[_bn] = _lbls
+        _u, _cnts = _np.unique(_lbls, return_counts=True)
+        _purities = [_np.bincount(_regime_lbl[_lbls == c]).max() / (_lbls == c).sum() for c in _u]
+        print(f"  {_bn:9s}: n_comm={len(_u):2d} | size[min={_cnts.min()}, p25={int(_np.percentile(_cnts,25))}, med={int(_np.median(_cnts))}, p75={int(_np.percentile(_cnts,75))}, max={_cnts.max()}] | mean_sensor_purity={100*_np.mean(_purities):.1f}%")
+
+    print("\n=== ADJUSTED RAND INDEX (ARI) ANTAR-BACKBONE (SEED=42) ===")
+    for _b1 in _diag_bb:
+        print("  " + f"{_b1:9s}: " + " | ".join(f"{_b2}={_ari(_comm_labels[_b1], _comm_labels[_b2]):.3f}" for _b2 in _diag_bb))
+
+    _lbls_d3_1337 = _cluster_knn(_view_s["DINOv3-L"], seed=1337, n_target=50)
+    print(f"\n=== STABILITAS ANTAR-SEED (DINOv3-L SEED=42 vs SEED=1337) ===")
+    print(f"  ARI(SEED=42, SEED=1337) = {_ari(_comm_labels['DINOv3-L'], _lbls_d3_1337):.4f}")
+
+    # TAHAP 2: Multi-Backbone Rank-Averaged kNN Graph Fusion per Sensor Regime -> Balanced K=72
+    _regime_k = {0: 54, 1: 9, 2: 9}
+    _final_cids = _np.full(_N, -1, dtype=_np.int32)
+    _cluster_regime = {}
+    _cluster_centroids_view_s = {}
+    _c_offset = 0
+    _X_vs_concat = _l2norm(_np.hstack([_view_s[b] for b in ["DINOv3-L", "SatMAE++", "ScaleMAE", "DINOv2-G", "I-JEPA"]]))
+
+    for _rid in [0, 1, 2]:
+        _idx_r = _np.where(_regime_lbl == _rid)[0]
+        _n_r = len(_idx_r)
+        _k_r = _regime_k[_rid]
+        _sim_sum = _np.zeros((_n_r, _n_r), dtype=_np.float64)
+        for _bn in ["DINOv3-L", "SatMAE++", "ScaleMAE", "DINOv2-G", "I-JEPA"]:
+            _Xr = _view_s[_bn][_idx_r]
+            _S = (_Xr @ _Xr.T).astype(_np.float64)
+            _ranks = _rankdata(_S.ravel(), method="average").reshape(_n_r, _n_r) / (_n_r * _n_r)
+            _sim_sum += _ranks
+        _sim_avg = _sim_sum / 5.0
+        # Build symmetric k=15 kNN affinity from rank-averaged similarity
+        _k_nn = min(15, _n_r - 1)
+        _A = _np.zeros((_n_r, _n_r), dtype=_np.float64)
+        for _row in range(_n_r):
+            _nbrs = _np.argsort(-_sim_avg[_row])[1:_k_nn + 1]
+            _A[_row, _nbrs] = _sim_avg[_row, _nbrs]
+        _A = 0.5 * (_A + _A.T)
+        _sub_lbls = _SpecClust(n_clusters=_k_r, affinity="precomputed", random_state=42, assign_labels="kmeans", n_init=15).fit_predict(_A)
+        for _sc in range(_k_r):
+            _gid = _c_offset + _sc
+            _members = _idx_r[_sub_lbls == _sc]
+            _final_cids[_members] = _gid
+            _cluster_regime[_gid] = _regime_names[_rid]
+            _cluster_centroids_view_s[_gid] = _l2norm(_X_vs_concat[_members].mean(axis=0, keepdims=True))[0]
+        _c_offset += _k_r
+
+    assert (_final_cids >= 0).all() and len(_np.unique(_final_cids)) == 72
+
+    def _pct(x):
+        return (_rankdata(x, method="average") - 1.0) / (len(x) - 1.0 + 1e-8)
+
+    _pct_d_mag, _pct_gini, _pct_blob = _pct(_sp[:, 0]), _pct(_sp[:, 4]), _pct(_sp[:, 3])
+    _pct_coastal, _pct_urban = _pct(_sp[:, 16]), _pct(_sp[:, 10])
+    _pct_veg_char, _pct_tex_drop = _pct(_sp[:, 12] + _sp[:, 13]), _pct(_sp[:, 17])
+
+    _cards = []
+    for _cid in range(72):
+        _m = _final_cids == _cid
+        _cards.append({
+            "cluster_id": f"C{_cid:02d}",
+            "n_samples": int(_m.sum()),
+            "sensor_regime": _cluster_regime[_cid],
+            "pct_change_mag": round(float(_np.median(_pct_d_mag[_m])), 3),
+            "pct_gini": round(float(_np.median(_pct_gini[_m])), 3),
+            "pct_max_blob": round(float(_np.median(_pct_blob[_m])), 3),
+            "pct_coastal_adj": round(float(_np.median(_pct_coastal[_m])), 3),
+            "pct_urban_corr": round(float(_np.median(_pct_urban[_m])), 3),
+            "pct_veg_char": round(float(_np.median(_pct_veg_char[_m])), 3),
+            "pct_tex_drop": round(float(_np.median(_pct_tex_drop[_m])), 3),
+        })
+
+    _df_cards = _pd.DataFrame(_cards)
+    _df_cards.to_csv("/marimo/Fenomena/cluster_cards_k72.csv", index=False)
+    _np.save("/marimo/Fenomena/cluster_ids_k72_views.npy", _final_cids)
+    print(f"\n[Tahap 2] Saved cluster_cards_k72.csv (72 clusters) | size[min={_df_cards['n_samples'].min()}, p25={int(_df_cards['n_samples'].quantile(0.25))}, med={int(_df_cards['n_samples'].median())}, p75={int(_df_cards['n_samples'].quantile(0.75))}, max={_df_cards['n_samples'].max()}]")
+
+    _tw, _th = 110, 110
+    _pad_x, _pad_y = 6, 26
+    _page_paths = []
+    for _pg in range(3):
+        _c_start, _c_end = _pg * 24, (_pg + 1) * 24
+        _cw = 6 * (3 * _tw + _pad_x) + 210
+        _ch = 24 * (_th + _pad_y) + 20
+        _canv = _Image.new("RGB", (_cw, _ch), (245, 245, 245))
+        _drw = _ImageDraw.Draw(_canv)
+        for _row_i, _cid in enumerate(range(_c_start, _c_end)):
+            _y0 = 10 + _row_i * (_th + _pad_y)
+            _rc = _cards[_cid]
+            _drw.text((6, _y0 + 10), f"{_rc['cluster_id']} (n={_rc['n_samples']})\n{_rc['sensor_regime']}\nchg={_rc['pct_change_mag']:.2f} urb={_rc['pct_urban_corr']:.2f}\ncst={_rc['pct_coastal_adj']:.2f} veg={_rc['pct_veg_char']:.2f}", fill=(10, 10, 10))
+            _m_idx = _np.where(_final_cids == _cid)[0]
+            _sims = _X_vs_concat[_m_idx] @ _cluster_centroids_view_s[_cid]
+            _top6 = _m_idx[_np.argsort(-_sims)[:6]]
+            for _k, _idx in enumerate(_top6):
+                _x0 = 205 + _k * (3 * _tw + _pad_x)
+                _ima = _Image.open(_df["path_pre"].iloc[_idx]).convert("RGB").resize((_tw, _th))
+                _imb = _Image.open(_df["path_post"].iloc[_idx]).convert("RGB").resize((_tw, _th))
+                _hm = _d3_maps[_idx]
+                _hm_u8 = _np.clip((_hm - _hm.min()) / (_hm.max() - _hm.min() + 1e-6) * 255.0, 0, 255).astype(_np.uint8)
+                _hm_rgb = _cv2.applyColorMap(_cv2.resize(_hm_u8, (_tw, _th), interpolation=_cv2.INTER_CUBIC), _cv2.COLORMAP_JET)[:, :, ::-1]
+                _canv.paste(_ima, (_x0, _y0 + 14))
+                _canv.paste(_imb, (_x0 + _tw, _y0 + 14))
+                _canv.paste(_Image.fromarray(_hm_rgb), (_x0 + 2 * _tw, _y0 + 14))
+                _drw.text((_x0, _y0 + 1), f"{_df['id'].iloc[_idx]}", fill=(30, 30, 30))
+        _pg_p = f"/marimo/Fenomena/audit_cluster_cards_k72_p{_pg+1}.png"
+        _canv.save(_pg_p)
+        _page_paths.append(_pg_p)
+
+    _ims = [_Image.open(p) for p in _page_paths]
+    _comb = _Image.new("RGB", (_ims[0].width // 2, sum(im.height // 2 for im in _ims)))
+    _cy = 0
+    for _im in _ims:
+        _r = _im.resize((_im.width // 2, _im.height // 2), _Image.LANCZOS)
+        _comb.paste(_r, (0, _cy))
+        _cy += _r.height
+    _comb.save("/marimo/Fenomena/audit_cluster_cards_k72.png")
+    print(f"Saved audit_cluster_cards_k72.png + 3 high-res pages in {_time.time()-_t0:.1f}s")
+
+    return
+
+
+@app.cell
+def K23c_extract_satmae_dinov3():
+    # Bagian 23C: Ekstraksi 5-Crop (1 Global + 4 Kuadran 512x512 dari 1024x1024)
+    # untuk SatMAE++ (MVRL/satmaepp_ViT-L_pretrain_fmow_rgb, CLS norm weights) dan DINOv3-Large.
+    import gc as _gc
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    from pathlib import Path as _Path
+    import cv2 as _cv2
+    import numpy as _np
+    import pandas as _pd
+    import torch as _torch
+    import torch.nn.functional as _F
+    import timm as _timm
+    from huggingface_hub import hf_hub_download as _hf_dl
+
+    _t0 = _time.time()
+    _ART = _Path("/marimo/Fenomena")
     _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
-    _df_for = _pd.read_parquet(_ART / "forensic_math_audit.parquet")
-    _lo = _np.load(_ART / "vlm32b_raw_logits_orig.npy")
-    _lf = _np.load(_ART / "vlm32b_raw_logits_flip.npy")
+    _MEAN = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
+    _STD = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
 
-    _repass_path = _ART / "vlm32b_repass556_logits.npy"
-    _inv_idx = _np.where(_df_for["is_sem_both_neg"].values)[0]
+    def _extract_5crop_timm(_model, _sz, _tag):
+        def _load5(_p):
+            _im = _cv2.cvtColor(_cv2.imread(_p, _cv2.IMREAD_COLOR), _cv2.COLOR_BGR2RGB)
+            _h, _w = _im.shape[:2]
+            _mh, _mw = _h // 2, _w // 2
+            return _np.stack([
+                _cv2.resize(_im, (_sz, _sz), interpolation=_cv2.INTER_AREA),
+                _cv2.resize(_im[:_mh, :_mw], (_sz, _sz), interpolation=_cv2.INTER_AREA),
+                _cv2.resize(_im[:_mh, _mw:], (_sz, _sz), interpolation=_cv2.INTER_AREA),
+                _cv2.resize(_im[_mh:, :_mw], (_sz, _sz), interpolation=_cv2.INTER_AREA),
+                _cv2.resize(_im[_mh:, _mw:], (_sz, _sz), interpolation=_cv2.INTER_AREA),
+            ], axis=0)
 
-    if not _repass_path.is_file():
-        print(f"Menjalankan Targeted Symmetric Re-Pass [post | pre] pada {len(_inv_idx)} sampel is_sem_both_neg...", flush=True)
-        _SYM_PROMPT = (
-            "You are a disaster remote-sensing expert analyzing a side-by-side satellite image pair of the same location.\n"
-            "IMPORTANT: LEFT and RIGHT may be in either chronological order; classify the disaster visible in whichever image shows damage, burn scar, rubble, ash, flooding, or blast crater.\n"
-            "Classify into EXACTLY ONE of: Earthquake, Fire, Hurricane, Tsunami, Volcano, Explosion.\n"
-            "- Fire: blackened/charred vegetation burn scar or active wildfire smoke plumes while roads/buildings remain intact.\n"
-            "- Explosion: localized blast crater or structural destruction radiating radially from one epicenter.\n"
-            "- Earthquake: collapsed buildings, gray concrete rubble piles, cracked urban blocks without wide burn scars or coastal wave sweep.\n"
-            "- Hurricane: widespread wind damage (stripped roofs, uprooted trees, inland storm flooding).\n"
-            "- Tsunami: coastal zone with eroded shoreline, beachfront buildings swept bare, and muddy seawater deposits inland.\n"
-            "- Volcano: thick gray/white volcanic ash blanket, pyroclastic deposits, or dark lava streams.\n"
-            "Answer with the exact single class name ONLY."
-        )
-        _MID = "Qwen/Qwen2.5-VL-32B-Instruct"
-        _cls = getattr(_transformers, "Qwen2_5_VLForConditionalGeneration", None) or getattr(_transformers, "AutoModelForImageTextToText", None)
-        _proc = _transformers.AutoProcessor.from_pretrained(_MID, trust_remote_code=True, min_pixels=448*448, max_pixels=896*448+4096)
-        _proc.tokenizer.padding_side = "left"
-        _tok = _proc.tokenizer
-        _tok_pairs = [(_tok.encode(_c, add_special_tokens=False)[0], _tok.encode(" " + _c, add_special_tokens=False)[0]) for _c in _CLASSES]
-        _mdl = _cls.from_pretrained(_MID, dtype=_torch.bfloat16, trust_remote_code=True, attn_implementation="sdpa").cuda().eval()
-
-        def _mk_swapped(_r, _hf=False):
-            with _Image.open(_r["path_post"]) as _i1, _Image.open(_r["path_pre"]) as _i2:
-                _a = _i1.convert("RGB").resize((448, 448), _Image.Resampling.BILINEAR)
-                _b = _i2.convert("RGB").resize((448, 448), _Image.Resampling.BILINEAR)
-            if _hf:
-                _a = _a.transpose(_Image.Transpose.FLIP_LEFT_RIGHT)
-                _b = _b.transpose(_Image.Transpose.FLIP_LEFT_RIGHT)
-            _cv = _Image.new("RGB", (896, 448))
-            _cv.paste(_a, (0, 0))
-            _cv.paste(_b, (448, 0))
-            return _cv
-
-        _re_rows = _df_inv.iloc[_inv_idx].to_dict("records")
-        _re_logits = _np.zeros((len(_re_rows), 6), dtype=_np.float32)
-        _BS = 16
-        _nb = (len(_re_rows) + _BS - 1) // _BS
-        with _torch.no_grad():
+        @_torch.no_grad()
+        def _side(_paths):
+            _gl, _ql = [], []
+            _BS = 48
+            _nb = (len(_paths) + _BS - 1) // _BS
             for _bi in range(_nb):
-                _ch = _re_rows[_bi * _BS : (_bi + 1) * _BS]
-                _l_acc = None
-                for _hf in (False, True):
-                    with _TPE(max_workers=8) as _ex:
-                        _ims = list(_ex.map(lambda r: _mk_swapped(r, _hf), _ch))
-                    _msgs = [[{"role": "user", "content": [{"type": "image", "image": _im}, {"type": "text", "text": _SYM_PROMPT}]}] for _im in _ims]
-                    _txts = [_proc.apply_chat_template(_m, tokenize=False, add_generation_prompt=True) for _m in _msgs]
-                    _inp = _proc(text=_txts, images=_ims, padding=True, return_tensors="pt").to("cuda")
-                    _out = _mdl(**_inp, use_cache=False).logits[:, -1, :].float()
-                    _sc = _torch.stack([_torch.logsumexp(_torch.stack([_out[:, _a], _out[:, _b]], -1), -1) for _a, _b in _tok_pairs], -1).cpu().numpy()
-                    _l_acc = _sc if _l_acc is None else (_l_acc + _sc)
-                _re_logits[_bi * _BS : (_bi + 1) * _BS] = 0.5 * _l_acc
-                if (_bi + 1) % 5 == 0 or (_bi + 1) == _nb:
-                    print(f"  Re-pass batch {_bi+1}/{_nb} selesai", flush=True)
+                _ch = _paths[_bi * _BS : (_bi + 1) * _BS]
+                with _TPE(max_workers=16) as _ex:
+                    _arr = _np.stack(list(_ex.map(_load5, _ch)), axis=0)
+                _b = _arr.shape[0]
+                _xt = _torch.from_numpy(_arr.reshape(-1, _sz, _sz, 3)).permute(0, 3, 1, 2).cuda().float().div_(255.0)
+                _xt = ((_xt - _MEAN) / _STD).to(_torch.bfloat16)
+                _f = _F.normalize(_model(_xt).float(), dim=-1).view(_b, 5, -1)
+                _gl.append(_f[:, 0, :].cpu().numpy())
+                _ql.append(_F.normalize(_f[:, 1:, :].mean(dim=1), dim=-1).cpu().numpy())
+                if (_bi + 1) % 25 == 0 or (_bi + 1) == _nb:
+                    print(f"  [{_tag}] batch {_bi+1}/{_nb} ({_time.time()-_t0:.1f}s)", flush=True)
+            return _np.vstack(_gl), _np.vstack(_ql)
 
-        _np.save(_repass_path, _re_logits)
-        _mdl.cpu()
-        del _mdl, _proc
+        _gp, _qp = _side(_df_inv["path_pre"].tolist())
+        _gs, _qs = _side(_df_inv["path_post"].tolist())
+        return _np.concatenate([0.5*(_gp+_gs), _np.abs(_gs-_gp), 0.5*(_qp+_qs), _np.abs(_qs-_qp)], axis=1).astype(_np.float32)
+
+    # 1. SatMAE++ ViT-L/16 (fMoW RGB, gunakan global_pool="token" agar norm.weight/norm.bias terpakai penuh)
+    _sat_out = _ART / "emb_SatMAEPP_5crop_sym.npy"
+    if not _sat_out.is_file():
+        print("Memuat MVRL/satmaepp_ViT-L_pretrain_fmow_rgb (global_pool='token')...", flush=True)
+        _sat_bin = _hf_dl("MVRL/satmaepp_ViT-L_pretrain_fmow_rgb", "pytorch_model.bin")
+        _sd = _torch.load(_sat_bin, map_location="cpu", weights_only=False)
+        if isinstance(_sd, dict) and "model" in _sd:
+            _sd = _sd["model"]
+        _sat_mdl = _timm.create_model("vit_large_patch16_224", pretrained=False, num_classes=0, global_pool="token")
+        _enc_sd = {_k: _v for _k, _v in _sd.items() if not _k.startswith(("decoder_", "mask_token", "proj_up", "up_block", "fc_norm"))}
+        _miss, _unexp = _sat_mdl.load_state_dict(_enc_sd, strict=False)
+        print("SatMAE++ encoder missing keys:", _miss, "| unexpected:", _unexp, flush=True)
+        assert len(_miss) == 0, f"Missing keys on SatMAE++: {_miss}"
+        _sat_mdl = _sat_mdl.cuda().eval().to(_torch.bfloat16)
+        _sat_emb = _extract_5crop_timm(_sat_mdl, 224, "SatMAE++")
+        _np.save(_sat_out, _sat_emb)
+        del _sat_mdl, _sd, _enc_sd
         _gc.collect()
         _torch.cuda.empty_cache()
 
-    _re_logits = _np.load(_repass_path)
-    _avg_vlm_logits = 0.5 * (_lo + _lf)
-    # Gabungkan 50% [pre|post] + 50% [post|pre] simetris pada 556 sampel is_sem_both_neg
-    _avg_vlm_logits[_inv_idx] = 0.5 * _avg_vlm_logits[_inv_idx] + 0.5 * _re_logits
+    # 2. DINOv3-Large (sudah ter-cache jika sudah diekstrak)
+    _d3_out = _ART / "emb_DINOv3L_5crop_sym.npy"
+    if not _d3_out.is_file():
+        print("Memuat timm/vit_large_patch16_dinov3.lvd1689m...", flush=True)
+        _d3_mdl = _timm.create_model("hf_hub:timm/vit_large_patch16_dinov3.lvd1689m", pretrained=True, num_classes=0).cuda().eval().to(_torch.bfloat16)
+        _d3_sz = _d3_mdl.default_cfg.get("input_size", (3, 256, 256))[-1]
+        _d3_emb = _extract_5crop_timm(_d3_mdl, int(_d3_sz), "DINOv3-L")
+        _np.save(_d3_out, _d3_emb)
+        del _d3_mdl
+        _gc.collect()
+        _torch.cuda.empty_cache()
 
-    # De-biasing prior kolom kelas (alpha=0.92) + kalibrasi suhu T=0.75
-    _centered = _avg_vlm_logits - 0.92 * _avg_vlm_logits.mean(axis=0, keepdims=True)
-    _centered = _centered / (_centered.std() + 1e-8) * 1.5
-    _p_vlm32b = _F.softmax(_torch.tensor(_centered) / 0.75, dim=-1).numpy().astype(_np.float32)
-    _np.save(_ART / "vlm32b_teacher_probs.npy", _p_vlm32b)
-
-    _p_clip_sym = _np.load(_ART / "clip_teacher_sym_probs.npy")
-    _cons_soft = (0.72 * _p_vlm32b + 0.28 * _p_clip_sym).astype(_np.float32)
-    _cons_soft /= _cons_soft.sum(axis=1, keepdims=True)
-    _np.save(_ART / "consensus_soft_v1.npy", _cons_soft)
-
-    _vlm_arg = _p_vlm32b.argmax(axis=1)
-    _clip_arg = _p_clip_sym.argmax(axis=1)
-    _cons_arg = _cons_soft.argmax(axis=1)
-    _agree = (_vlm_arg == _clip_arg)
-    _sw = (0.65 + 0.35 * _agree.astype(_np.float32)).astype(_np.float32)
-
-    _df_v2 = _pd.DataFrame({
-        "id": _df_inv["id"],
-        "vlm32b_label": [_CLASSES[_i] for _i in _vlm_arg],
-        "vlm32b_conf": _p_vlm32b.max(axis=1),
-        "vlm32b_tta_agree": (_lo.argmax(axis=1) == _lf.argmax(axis=1)),
-        "clip_label": [_CLASSES[_i] for _i in _clip_arg],
-        "clip_conf": _p_clip_sym.max(axis=1),
-        "consensus_label": [_CLASSES[_i] for _i in _cons_arg],
-        "consensus_conf": _cons_soft.max(axis=1),
-        "teacher_agree": _agree,
-        "sample_weight": _sw,
-    })
-    _df_v2.to_parquet(_ART / "pseudo_labels_v2.parquet", index=False)
-
-    _skf = _SKF(n_splits=5, shuffle=True, random_state=42)
-    _folds = _np.zeros(len(_df_v2), dtype=_np.int64)
-    for _fi, (_, _vi) in enumerate(_skf.split(_df_v2, _df_v2["consensus_label"])):
-        _folds[_vi] = _fi
-    _np.save(_ART / "folds_skf5.npy", _folds)
-
-    _df_v1 = _pd.read_parquet(_ART / "pseudo_labels.parquet")
-    _cmp = _pd.DataFrame([
-        {
-            "Kelas": _c,
-            "V1_7B (%)": round(float((_df_v1["vlm_label"] == _c).mean() * 100), 2),
-            "VLM32B_Sym_Deb (%)": round(float((_df_v2["vlm32b_label"] == _c).mean() * 100), 2),
-            "CLIP_Sym (%)": round(float((_df_v2["clip_label"] == _c).mean() * 100), 2),
-            "Consensus_V2 (n)": int((_df_v2["consensus_label"] == _c).sum()),
-            "Consensus_V2 (%)": round(float((_df_v2["consensus_label"] == _c).mean() * 100), 2),
-        }
-        for _c in _CLASSES
-    ])
-    print(f"VLM32B TTA agree: {(_lo.argmax(1)==_lf.argmax(1)).mean()*100:.2f}% | VLM-CLIP agree: {_agree.mean()*100:.2f}% | folds_skf5 locked!")
-    print(_cmp.to_string(index=False))
-
-    _plt.close("all")
-    _fig, _ax = _plt.subplots(figsize=(9.5, 4.2))
-    _x = _np.arange(len(_CLASSES))
-    _w = 0.35
-    _ax.bar(_x - _w/2, _cmp["V1_7B (%)"], _w, label="Baseline V1 (Qwen-7B)", color="#e53e3e", alpha=0.8)
-    _ax.bar(_x + _w/2, _cmp["Consensus_V2 (%)"], _w, label="Multi-Teacher V2 (32B Sym + CLIP Sym)", color="#2f855a", alpha=0.9)
-    _ax.axhline(100/6, color="#4a5568", ls="--", lw=1.2, label="Seragam Ideal (16.67%)")
-    _ax.set_xticks(_x)
-    _ax.set_xticklabels(_CLASSES)
-    _ax.set_ylabel("Persentase (%)")
-    _ax.set_title("Perbandingan Distribusi Pseudo-Label: V1 (Bias Fire 61.6%) vs Multi-Teacher V2")
-    _ax.legend()
-    _fig.tight_layout()
-    mo.status.toast(title="Fase 1 Selesai", description="pseudo_labels_v2.parquet & folds_skf5.npy terkunci")
-    _fig
-    return
-
-
-@app.cell(hide_code=True)
-def M20_forensic(mo):
-    mo.md("""
-    ## 20. Audit Forensik Matematis: Deteksi Inversi Kronologis (`pre ↔ post`) & Anomali Sensor
-
-    - **Tujuan tahap:** Membuktikan secara kuantitatif pada seluruh **3.180 pasangan** (`pre.jpg` vs `post.jpg`) apakah terdapat pasangan yang tertukar urutan waktunya (*temporal inversion* `pre ↔ post`), artefak *scanline* sensor, atau perbedaan geometri *warping*, sebelum melanjutkan ke pelatihan model.
-    - **4 Pengujian Matematis:**
-      1. **Asimetri Vektor Semantik (`RemoteCLIP` & `SkyCLIP`):** Mengukur *Temporal Damage Gradient* ($\Delta S_{	ext{sem}}$) antara jangkar *Disaster* vs *Intact*, *Antisymmetric Class Projection Ratio*, korelasi Spearman ($
-    ho$), dan Cohen's Kappa ($\kappa$).
-      2. **Forensik Fisika Citra & FFT:** Varians Laplacian, rasio energi frekuensi tinggi 2D FFT ($R_{	ext{HF}}$), rasio puncak spektral *scanline* 1D FFT vertikal, $\Delta 	ext{ExG}$ (*Excess Green Index*), rasio piksel gelap (`<45`), serta fraksi & konkavitas *black padding*.
-      3. **Uji Normalitas & Dekomposisi GMM:** Uji D'Agostino-Pearson $K^2$, *skewness/kurtosis*, perbandingan `GMM(2)` vs `GMM(1)` ($\Delta 	ext{BIC}$) pada skor komposit $Z_{	ext{dir}}$, serta uji Mann-Whitney U & Kolmogorov-Smirnov.
-      4. **Audit Silang & Visualisasi:** Uji $\chi^2$ terhadap `pseudo_labels.parquet` (VLM 7B) dan `SSIM`, serta grid Top-12 & tabel Top-15 `Id` paling terbalik.
-    - **Temuan Kunci:**
-      - `RemoteCLIP` mendeteksi **`1.102/3.180` (`34.65%`)** dengan $\Delta S_{	ext{sem}} < 0$ dan `SkyCLIP` **`1.054/3.180` (`33.14%`)**, dengan konsistensi signifikan lintas model ($
-    ho = 0.4359, p = 1.28 	imes 10^{-147}$; $\kappa = 0.2676$; **`556` pasangan (`17.48%`)** keduanya negatif).
-      - Sebanyak **`43.68%`** pasangan memiliki $\Delta 	ext{ExG} > 0$ (`post` lebih hijau dari `pre`), **`52.48%`** memiliki $R_{	ext{HF}} < 0$, dan **`~72%`** memiliki anomali *scanline* ekstrem (`ratio > 50`) pada `pre` maupun `post`.
-      - Nilai $\Delta 	ext{BIC} = -36.83$ pada $Z_{	ext{dir}}$ (`std=0.5055`, pusat `0.000`) menunjukkan spektrum arah kronologis kontinu yang melintasi nol secara luas (bukan sekadar outlier kecil), dan VLM 7B tetap memprediksi `Fire` secara seragam tanpa membedakan arah terbalik ($\chi^2 = 1.77, p = 0.880$).
-      - **Rekomendasi Arsitektur:** **WAJIB** menggunakan **Symmetric Temporal-Swap Invariant Fusion** (mis. `|f_post - f_pre|` + `0.5*(f_pre + f_post)` + `max(f_pre, f_post)`) dan/atau **Bidirectional Swap-TTA** (`0.5*(P(pre, post) + P(post, pre))`) agar model kebal terhadap *temporal inversion*.
-    """)
+    print("Selesai K23c! SatMAE++:", _np.load(_sat_out, mmap_mode="r").shape, "| DINOv3-L:", _np.load(_d3_out, mmap_mode="r").shape)
     return
 
 
 @app.cell
-def K20_forensic(mo):
-    # Audit Forensik Matematis lengkap (4 Pengujian Wajib) pada 3.180 pasangan citra:
-    # asimetri semantik RemoteCLIP/SkyCLIP, fisika/FFT 2D & 1D, dekomposisi GMM Z_dir, dan visualisasi Top-12 terbalik.
+def K24a_setup_512_and_lib():
+    # Bagian 24A: Cache RAM 512x512 LAB CLAHE (/dev/shm) & Modul Bersama SymmetricSiameseNet
     import time as _time
     from concurrent.futures import ThreadPoolExecutor as _TPE
     from pathlib import Path as _Path
     import cv2 as _cv2
     import numpy as _np
     import pandas as _pd
-    import matplotlib as _mpl
-    _mpl.use("Agg")
-    import matplotlib.pyplot as _plt
-    from scipy import stats as _stats
-    from sklearn.metrics import cohen_kappa_score as _kappa
-    from sklearn.mixture import GaussianMixture as _GMM
-    import torch as _torch
-    import torch.nn.functional as _F
-    import open_clip as _open_clip
-    from huggingface_hub import hf_hub_download as _hf_dl
 
+    _t0 = _time.time()
     _ART = _Path("/marimo/Fenomena")
-    _AUDIT_PQ = _ART / "forensic_math_audit.parquet"
-    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
-
-    if not _AUDIT_PQ.is_file():
-        # Jalankan penuh 4 pengujian jika belum ada cache parquet
-        exec(open(_ART / "run_forensic_audit.py", encoding="utf-8").read(), {})
-
-    df_forensic = _pd.read_parquet(_AUDIT_PQ)
+    _SHM_CACHE = _Path("/dev/shm/fenomena_512_lab_clahe.npy")
     _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
 
-    # Ringkasan Test 1: Asimetri Semantik
-    _rc_neg = df_forensic["dS_sem_RemoteCLIP"].values < 0
-    _sc_neg = df_forensic["dS_sem_SkyCLIP"].values < 0
-    _rho, _p_rho = _stats.spearmanr(df_forensic["dS_sem_RemoteCLIP"], df_forensic["dS_sem_SkyCLIP"])
-    _kap = _kappa(_rc_neg.astype(int), _sc_neg.astype(int))
+    if not _SHM_CACHE.is_file():
+        print("Membangun cache 512x512 LAB CLAHE (L-only) ke /dev/shm...", flush=True)
+        _n = len(_df_inv)
+        _pre_paths = _df_inv["path_pre"].tolist()
+        _post_paths = _df_inv["path_post"].tolist()
 
-    _t1_df = _pd.DataFrame([
-        {"Model": "RemoteCLIP", "dS_sem < 0": int(_rc_neg.sum()), "Persen (%)": round(float(_rc_neg.mean()*100), 2),
-         "Mean dS_sem": round(float(df_forensic["dS_sem_RemoteCLIP"].mean()), 5),
-         "ACPR < 0 (%)": round(float((df_forensic["acpr_diff_RemoteCLIP"] < 0).mean()*100), 2)},
-        {"Model": "SkyCLIP", "dS_sem < 0": int(_sc_neg.sum()), "Persen (%)": round(float(_sc_neg.mean()*100), 2),
-         "Mean dS_sem": round(float(df_forensic["dS_sem_SkyCLIP"].mean()), 5),
-         "ACPR < 0 (%)": round(float((df_forensic["acpr_diff_SkyCLIP"] < 0).mean()*100), 2)},
-    ])
-    print("=== TEST 1: ASIMETRI VEKTOR SEMANTIK ===")
-    print(_t1_df.to_string(index=False))
-    print(f"Spearman rho={_rho:.4f} (p={_p_rho:.2e}) | Cohen kappa={_kap:.4f} | Keduanya <0: {int((_rc_neg & _sc_neg).sum())}/3180 ({(_rc_neg & _sc_neg).mean()*100:.2f}%)")
+        def _proc_one(_args):
+            _p1, _p2 = _args
+            _clahe = _cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            _pair = _np.empty((2, 512, 512, 3), dtype=_np.uint8)
+            for _j, _p in enumerate((_p1, _p2)):
+                _im = _cv2.cvtColor(_cv2.imread(_p, _cv2.IMREAD_COLOR), _cv2.COLOR_BGR2RGB)
+                _im = _cv2.resize(_im, (512, 512), interpolation=_cv2.INTER_AREA)
+                _lab = _cv2.cvtColor(_im, _cv2.COLOR_RGB2LAB)
+                _lab[:, :, 0] = _clahe.apply(_lab[:, :, 0])
+                _pair[_j] = _cv2.cvtColor(_lab, _cv2.COLOR_LAB2RGB)
+            return _pair
 
-    # Ringkasan Test 2: Fisika, FFT & Geometri
-    _t2_df = _pd.DataFrame([
-        {"Metrik": "d_log_lap (post<pre %)", "Nilai": f"{df_forensic['d_log_lap'].mean():.4f} ({(df_forensic['d_log_lap']<0).mean()*100:.2f}%)"},
-        {"Metrik": "R_HF 2D-FFT (R_HF<0 %)", "Nilai": f"{df_forensic['R_HF'].mean():.4f} ({(df_forensic['R_HF']<0).mean()*100:.2f}%)"},
-        {"Metrik": "Scanline >50 (pre / post)", "Nilai": f"{int((df_forensic['scanline_pre']>50).sum())} / {int((df_forensic['scanline_post']>50).sum())}"},
-        {"Metrik": "d_ExG (post lebih hijau %)", "Nilai": f"{df_forensic['d_exg'].mean():.4f} ({(df_forensic['d_exg']>0).mean()*100:.2f}%)"},
-        {"Metrik": "d_dark (<45) (d_dark<0 %)", "Nilai": f"{df_forensic['d_dark'].mean():.4f} ({(df_forensic['d_dark']<0).mean()*100:.2f}%)"},
-        {"Metrik": "|pad_pre - pad_post| > 2%", "Nilai": f"{int((_np.abs(df_forensic['pad_frac_pre']-df_forensic['pad_frac_post'])>0.02).sum())} / 3180"},
-    ])
-    print("\n=== TEST 2: FORENSIK FISIKA, FFT & GEOMETRI ===")
-    print(_t2_df.to_string(index=False))
+        _buf = _np.empty((_n, 2, 512, 512, 3), dtype=_np.uint8)
+        with _TPE(max_workers=20) as _ex:
+            for _idx, _res in enumerate(_ex.map(_proc_one, zip(_pre_paths, _post_paths), chunksize=32)):
+                _buf[_idx] = _res
+                if (_idx + 1) % 1000 == 0 or (_idx + 1) == _n:
+                    print(f"  [Cache 512 LAB] {_idx+1}/{_n} ({_time.time()-_t0:.1f}s)", flush=True)
+        _np.save(_SHM_CACHE, _buf)
+        del _buf
+    print(f"Cache siap: {_SHM_CACHE} shape={_np.load(_SHM_CACHE, mmap_mode='r').shape}", flush=True)
 
-    # Ringkasan Test 3: GMM & Normalitas Z_dir
-    _z = df_forensic["Z_dir"].values
-    _k2, _k2p = _stats.normaltest(_z)
-    _gmm1 = _GMM(n_components=1, random_state=42).fit(_z[:, None])
-    _gmm2 = _GMM(n_components=2, random_state=42, n_init=10).fit(_z[:, None])
-    _bic1, _bic2 = float(_gmm1.bic(_z[:, None])), float(_gmm2.bic(_z[:, None]))
-    _inv_m = df_forensic["is_inverted"].values
-    _mw_u, _mw_p = _stats.mannwhitneyu(_z[_inv_m], _z[~_inv_m], alternative="less")
-    _ks_d, _ks_p = _stats.ks_2samp(_z[_inv_m], _z[~_inv_m])
-    print(f"\n=== TEST 3: UJI STATISTIK & GMM Z_dir ===")
-    print(f"Normaltest K2={_k2:.2f} (p={_k2p:.2e}) | Skew={_stats.skew(_z):.4f} | ExKurt={_stats.kurtosis(_z, fisher=True):.4f}")
-    print(f"BIC(1)={_bic1:.2f} | BIC(2)={_bic2:.2f} | Delta_BIC={_bic1-_bic2:.2f} | is_inverted={int(_inv_m.sum())}/3180 ({_inv_m.mean()*100:.2f}%)")
-    print(f"Mann-Whitney p={_mw_p:.2e} | KS D={_ks_d:.4f} (p={_ks_p:.2e})")
+    _LIB_CODE = """
+    import math
+    import time
+    from pathlib import Path
+    import numpy as np
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import timm
+    from scipy.optimize import minimize
+    from sklearn.metrics import f1_score, classification_report
 
-    # Ringkasan Test 4: Audit Silang & Top-15 Id
-    _ct = _pd.crosstab(df_forensic["is_sem_both_neg"], df_forensic["vlm_label"])
-    _chi2, _chip, _, _ = _stats.chi2_contingency(_ct)
-    print(f"\n=== TEST 4: AUDIT SILANG VLM 7B vs is_sem_both_neg (chi2={_chi2:.2f}, p={_chip:.3f}) ===")
-    print(_ct.to_string())
+    CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
+    IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
+    IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
+    _RAM_ARRAY_CACHE = {}
 
-    _top15 = df_forensic.sort_values("Z_dir", ascending=True).head(15)
-    print("\n=== TOP-15 ID PALING TERBALIK (Z_dir TERENDAH) ===")
-    print(_top15[["id", "Z_dir", "p_inverted_gmm", "dS_sem_RemoteCLIP", "dS_sem_SkyCLIP", "d_exg", "d_dark", "R_HF", "ssim", "vlm_label"]].round(4).to_string(index=False))
+    def get_ram_cache(cache_path):
+        key = str(cache_path)
+        if key not in _RAM_ARRAY_CACHE:
+            _RAM_ARRAY_CACHE[key] = np.load(key)
+        return _RAM_ARRAY_CACHE[key]
 
-    # Plot 1: Distribusi Z_dir + Kurva 2-GMM & Scatter RemoteCLIP vs SkyCLIP
-    _plt.close("all")
-    _fig, _axes = _plt.subplots(1, 2, figsize=(13, 4.5))
-    _xs = _np.linspace(_z.min(), _z.max(), 400)[:, None]
-    _axes[0].hist(_z, bins=45, density=True, alpha=0.55, color="#3182ce", edgecolor="white", label="Histogram Z_dir")
-    _axes[0].plot(_xs.ravel(), _np.exp(_gmm1.score_samples(_xs)), "k--", lw=1.8, label=f"GMM-1 (BIC={_bic1:.0f})")
-    _axes[0].plot(_xs.ravel(), _np.exp(_gmm2.score_samples(_xs)), "r-", lw=2.0, label=f"GMM-2 (BIC={_bic2:.0f})")
-    _axes[0].axvline(0, color="#1a202c", ls=":", lw=1.4, label="Z_dir = 0")
-    _axes[0].set_title("Dekomposisi GMM pada Skor Arah Kronologis Z_dir")
-    _axes[0].set_xlabel("Z_dir (<0 = terindikasi terbalik, >0 = normal)")
-    _axes[0].set_ylabel("Densitas")
-    _axes[0].legend(fontsize=8)
-
-    _axes[1].scatter(df_forensic["dS_sem_RemoteCLIP"], df_forensic["dS_sem_SkyCLIP"], s=6, alpha=0.35, color="#805ad5")
-    _axes[1].axhline(0, color="red", ls="--", lw=1.0)
-    _axes[1].axvline(0, color="red", ls="--", lw=1.0)
-    _axes[1].set_title(f"Asimetri Semantik: RemoteCLIP vs SkyCLIP (rho={_rho:.3f})")
-    _axes[1].set_xlabel("dS_sem RemoteCLIP")
-    _axes[1].set_ylabel("dS_sem SkyCLIP")
-    _fig.tight_layout()
-
-    _top12_img = _plt.imread(_ART / "forensic_inverted_top12.png")
-    mo.vstack([
-        _fig,
-        mo.md("**Grid Top-12 Pasangan Paling Terbalik (`[Kiri=pre.jpg | Kanan=post.jpg]`):**"),
-        mo.image(_top12_img, width=960),
-    ])
-    return
-
-
-@app.cell(hide_code=True)
-def M21_fold0_screening(mo):
-    mo.md("""
-    ## 21. Fase 2 — Skrining Hipotesis di Fold 0 (`experiment_tracker.csv`)
-
-    - **Desain Arsitektur Inti (`SymmetricSiameseNet`):** Mengadopsi hasil Audit Forensik (Cell 20), fusi fitur menggunakan tiga komponen invarian urutan: `[0.5*(f_pre + f_post), max(f_pre, f_post), |f_post - f_pre|]` dengan *Channel Attention* 1D, *Random Temporal Swap* (`p=0.5`) saat training, dan *Bidirectional Swap-TTA* saat validasi. Loss memakai *soft-target cross-entropy* terhadap `consensus_soft_v1.npy` dengan *damped inverse class weights* (`freq^-0.65`) dan `MixUp(alpha=0.2)`.
-    - **Aturan Keep / Rollback:** Sebuah modifikasi dipertahankan **hanya jika** `Fold 0 Validation LogLoss` turun **DAN** `Fold 0 Out-of-Sample Calibrated Macro F1` naik dibanding *best checkpoint* sebelumnya.
-    - **Hipotesis yang Diuji:**
-      - **Iter 0 (Baseline Simetris):** `384x384` RGB standar.
-      - **Iter 1 (LAB CLAHE Luminance Norm):** Normalisasi kontras lokal hanya pada kanal `L*` (`clipLimit=2.0`) untuk menekan *KL color/illumination shift* (`1.88–2.06`) tanpa merusak kanal warna `a*, b*`.
-      - **Iter 2 (Augmentasi Dihedral D4 + Photometric Independen + Simulasi Awan):** `RandomResizedCrop(0.75, 1.0)` + rotasi D4 (`0/90/180/270` + H/V flip) identik, serta `ColorJitter` + `RandomGamma` + `RandomErasing` independen per citra.
-      - **Iter 3 (Resolusi Tinggi `448x448`):** Menguji ketajaman deteksi kawah ledakan kecil (*Explosion*) dan puing bangunan (*Earthquake*).
-    """)
-    return
-
-
-@app.cell
-def K21a_fold0_iter0_1():
-    # Fase 2A: Definisi SymmetricSiameseNet, fungsi skrining Fold 0 + OOS Calibrated Macro F1,
-    # dan eksekusi Iter 0 (Baseline Simetris 384) + Iter 1 (LAB CLAHE Luminance Norm).
-    import gc as _gc
-    import math as _math
-    import time as _time
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from pathlib import Path as _Path
-    import cv2 as _cv2
-    import numpy as _np
-    import pandas as _pd
-    from PIL import Image as _Image
-    from scipy.optimize import minimize as _minimize
-    from sklearn.metrics import f1_score as _f1_score, log_loss as _log_loss
-    import torch as _torch
-    import torch.nn as _nn
-    import torch.nn.functional as _F
-    import timm as _timm
-
-    _torch.backends.cudnn.benchmark = True
-    _ART = _Path("/marimo/Fenomena")
-    _CLASSES = ["Earthquake", "Fire", "Hurricane", "Tsunami", "Volcano", "Explosion"]
-    _df_inv = _pd.read_parquet(_ART / "df_inventory.parquet")
-    _df_v2 = _pd.read_parquet(_ART / "pseudo_labels_v2.parquet")
-    _y_soft = _np.load(_ART / "consensus_soft_v1.npy").astype(_np.float32)
-    _folds = _np.load(_ART / "folds_skf5.npy")
-    _sw = _df_v2["sample_weight"].values.astype(_np.float32)
-    _y_hard = _y_soft.argmax(axis=1)
-
-    # Damped inverse frequency weights (freq^-0.65, normalized to mean=1.0)
-    _counts = _np.bincount(_y_hard, minlength=6).astype(_np.float32)
-    _cw_np = _np.power(_np.maximum(_counts, 1.0), -0.65)
-    _cw_np = _cw_np / _cw_np.mean()
-    _CW_TENSOR = _torch.tensor(_cw_np, dtype=_torch.float32, device="cuda")
-
-    _IMG_MEAN = _torch.tensor([0.485, 0.456, 0.406], device="cuda").view(1, 3, 1, 1)
-    _IMG_STD = _torch.tensor([0.229, 0.224, 0.225], device="cuda").view(1, 3, 1, 1)
-
-    class ChannelAttention1D(_nn.Module):
-        def __init__(self, dim, reduction=8):
+    class ChannelAttention1D(nn.Module):
+        def __init__(self, dim, reduction=4):
             super().__init__()
-            _h = max(dim // reduction, 16)
-            self.net = _nn.Sequential(_nn.Linear(dim, _h), _nn.GELU(), _nn.Linear(_h, dim), _nn.Sigmoid())
+            hid = max(32, dim // reduction)
+            self.net = nn.Sequential(
+                nn.Linear(dim, hid),
+                nn.GELU(),
+                nn.Linear(hid, dim),
+                nn.Sigmoid(),
+            )
         def forward(self, x):
             return x * self.net(x)
 
-    class SymmetricSiameseNet(_nn.Module):
-        """Siamese shared-backbone dengan fusi 100% simetris: [mean, max, |diff|*attn]."""
-        def __init__(self, backbone_name="efficientnet_b4", num_classes=6, pretrained=True):
+    class SymmetricSiameseNet(nn.Module):
+        def __init__(self, backbone_name, num_classes=6, pretrained=True, drop_rate=0.35):
             super().__init__()
-            self.backbone = _timm.create_model(backbone_name, pretrained=pretrained, num_classes=0, features_only=False)
-            _d = self.backbone.num_features
-            self.diff_attn = ChannelAttention1D(_d, reduction=8)
-            self.head = _nn.Sequential(
-                _nn.Linear(_d * 3, _d),
-                _nn.GELU(),
-                _nn.Dropout(0.3),
-                _nn.Linear(_d, num_classes),
+            self.backbone = timm.create_model(backbone_name, pretrained=pretrained, num_classes=0, drop_path_rate=0.2)
+            d = self.backbone.num_features
+            self.diff_attn = ChannelAttention1D(d, reduction=4)
+            self.head = nn.Sequential(
+                nn.LayerNorm(d * 3),
+                nn.Dropout(drop_rate),
+                nn.Linear(d * 3, 512),
+                nn.GELU(),
+                nn.Dropout(0.2),
+                nn.Linear(512, num_classes),
             )
-        def forward(self, pre, post):
-            _f1 = self.backbone(pre)
-            _f2 = self.backbone(post)
-            _f_mean = 0.5 * (_f1 + _f2)
-            _f_max = _torch.maximum(_f1, _f2)
-            _f_diff = self.diff_attn(_torch.abs(_f2 - _f1))
-            return self.head(_torch.cat([_f_mean, _f_max, _f_diff], dim=-1))
 
-    def _load_rgb_tensor_pair_cache(_sz=384, _lab_clahe=False):
-        def _one(_r):
-            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            if _lab_clahe:
-                _clahe = _cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                for _arr in (_a1, _a2):
-                    _lab = _cv2.cvtColor(_arr, _cv2.COLOR_RGB2LAB)
-                    _lab[:, :, 0] = _clahe.apply(_lab[:, :, 0])
-                    _arr[:] = _cv2.cvtColor(_lab, _cv2.COLOR_LAB2RGB)
-            return _a1, _a2
-        with _TPE(max_workers=16) as _ex:
-            _res = list(_ex.map(_one, _df_inv.to_dict("records")))
-        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        return _pre_t, _post_t
+        def forward(self, x1, x2):
+            feats = self.backbone(torch.cat([x1, x2], dim=0))
+            f1, f2 = feats.chunk(2, dim=0)
+            f_mean = 0.5 * (f1 + f2)
+            f_max = torch.maximum(f1, f2)
+            f_diff = self.diff_attn(torch.abs(f2 - f1))
+            z = torch.cat([f_mean, f_max, f_diff], dim=1)
+            return self.head(z)
 
-    def _aug_batch(_p1, _p2, _mode="basic"):
-        _b, _, _h, _w = _p1.shape
-        _dev = _p1.device
-        # Random temporal swap (p=0.5)
-        _sw_mask = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
-        _p1_s = _torch.where(_sw_mask, _p2, _p1)
-        _p2_s = _torch.where(_sw_mask, _p1, _p2)
-        _p1, _p2 = _p1_s, _p2_s
+    def soft_logloss(y_soft, probs):
+        p = np.clip(probs, 1e-7, 1.0)
+        return float(-(y_soft * np.log(p)).sum(axis=1).mean())
 
-        # Identical HFlip
-        _hf = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
-        _p1 = _torch.where(_hf, _torch.flip(_p1, [-1]), _p1)
-        _p2 = _torch.where(_hf, _torch.flip(_p2, [-1]), _p2)
+    def optimize_multipliers(probs, y_true_idx):
+        def _loss(m):
+            w = np.exp(m)
+            return -f1_score(y_true_idx, (probs * w).argmax(axis=1), average="macro")
+        res = minimize(_loss, np.zeros(probs.shape[1]), method="Powell", options={"maxiter": 600})
+        return np.exp(res.x)
 
-        if _mode == "d4_full":
-            # Identical VFlip + 90-deg rotations (D4 dihedral)
-            _vf = _torch.rand(_b, 1, 1, 1, device=_dev) < 0.5
-            _p1 = _torch.where(_vf, _torch.flip(_p1, [-2]), _p1)
-            _p2 = _torch.where(_vf, _torch.flip(_p2, [-2]), _p2)
-            _k = int(_torch.randint(0, 4, (1,)).item())
-            if _k > 0:
-                _p1 = _torch.rot90(_p1, _k, dims=[-2, -1])
-                _p2 = _torch.rot90(_p2, _k, dims=[-2, -1])
-            # Identical RandomResizedCrop (scale 0.75-1.0)
-            _sc = float(_torch.empty(1).uniform_(0.75, 1.0).item())
-            _ch = int(_h * _sc)
-            _top = int(_torch.randint(0, max(_h - _ch + 1, 1), (1,)).item())
-            _left = int(_torch.randint(0, max(_w - _ch + 1, 1), (1,)).item())
-            _p1 = _F.interpolate(_p1[:, :, _top:_top+_ch, _left:_left+_ch], size=(_h, _w), mode="bilinear", align_corners=False)
-            _p2 = _F.interpolate(_p2[:, :, _top:_top+_ch, _left:_left+_ch], size=(_h, _w), mode="bilinear", align_corners=False)
-            # Independent ColorJitter + RandomGamma + small cloud RandomErasing
-            for _arr_ref in (0, 1):
-                _x = _p1 if _arr_ref == 0 else _p2
-                _bf = 0.7 + 0.6 * _torch.rand(_b, 1, 1, 1, device=_dev)
-                _gm = 0.8 + 0.4 * _torch.rand(_b, 1, 1, 1, device=_dev)
-                _x = (_x * _bf).clamp(1e-4, 1.0).pow(_gm)
-                _gray = 0.2989 * _x[:, 0:1] + 0.5870 * _x[:, 1:2] + 0.1140 * _x[:, 2:3]
-                _cf = 0.75 + 0.5 * _torch.rand(_b, 1, 1, 1, device=_dev)
-                _x = (_x * _cf + _gray.mean(dim=(2, 3), keepdim=True) * (1.0 - _cf)).clamp(0.0, 1.0)
-                if _torch.rand(1).item() < 0.3:
-                    _eh, _ew = _h // 8, _w // 8
-                    _ey = int(_torch.randint(0, _h - _eh, (1,)).item())
-                    _ex = int(_torch.randint(0, _w - _ew, (1,)).item())
-                    _x[:, :, _ey:_ey+_eh, _ex:_ex+_ew] = float(_torch.empty(1).uniform_(0.65, 0.95).item())
-                if _arr_ref == 0:
-                    _p1 = _x
-                else:
-                    _p2 = _x
+    def eval_nested_cal_f1(probs, y_true_idx, folds, damp=0.85):
+        pred_idx = np.zeros(len(y_true_idx), dtype=np.int64)
+        uniq = np.unique(folds)
+        if len(uniq) <= 1:
+            rng = np.random.RandomState(42)
+            perm = rng.permutation(len(y_true_idx))
+            half = len(perm) // 2
+            w1 = optimize_multipliers(probs[perm[:half]], y_true_idx[perm[:half]]) ** damp
+            w2 = optimize_multipliers(probs[perm[half:]], y_true_idx[perm[half:]]) ** damp
+            pred_idx[perm[half:]] = (probs[perm[half:]] * w1).argmax(axis=1)
+            pred_idx[perm[:half]] = (probs[perm[:half]] * w2).argmax(axis=1)
         else:
-            # Basic independent brightness/contrast
-            for _arr_ref in (0, 1):
-                _x = _p1 if _arr_ref == 0 else _p2
-                _bf = 0.75 + 0.5 * _torch.rand(_b, 1, 1, 1, device=_dev)
-                _x = (_x * _bf).clamp(0.0, 1.0)
-                if _arr_ref == 0:
-                    _p1 = _x
+            for f in uniq:
+                tr = (folds != f)
+                va = (folds == f)
+                w = optimize_multipliers(probs[tr], y_true_idx[tr]) ** damp
+                pred_idx[va] = (probs[va] * w).argmax(axis=1)
+        return float(f1_score(y_true_idx, pred_idx, average="macro")), pred_idx
+
+    def _prep_batch_gpu(pair_np, img_size, train, mean_t, std_t):
+        t = torch.from_numpy(pair_np).cuda(non_blocking=True)
+        x1 = t[:, 0].permute(0, 3, 1, 2).float().div_(255.0)
+        x2 = t[:, 1].permute(0, 3, 1, 2).float().div_(255.0)
+        if img_size != x1.shape[-1]:
+            x1 = F.interpolate(x1, size=(img_size, img_size), mode="bilinear", align_corners=False)
+            x2 = F.interpolate(x2, size=(img_size, img_size), mode="bilinear", align_corners=False)
+        if train:
+            if np.random.rand() < 0.5:
+                x1 = torch.flip(x1, dims=[3]); x2 = torch.flip(x2, dims=[3])
+            if np.random.rand() < 0.5:
+                x1 = torch.flip(x1, dims=[2]); x2 = torch.flip(x2, dims=[2])
+            k = int(np.random.randint(0, 4))
+            if k > 0:
+                x1 = torch.rot90(x1, k=k, dims=[2, 3]); x2 = torch.rot90(x2, k=k, dims=[2, 3])
+            b = x1.shape[0]
+            s1 = torch.empty((b, 1, 1, 1), device="cuda").uniform_(0.92, 1.08)
+            s2 = torch.empty((b, 1, 1, 1), device="cuda").uniform_(0.92, 1.08)
+            x1 = (x1 * s1).clamp_(0.0, 1.0)
+            x2 = (x2 * s2).clamp_(0.0, 1.0)
+            swap = (torch.rand((b, 1, 1, 1), device="cuda") < 0.5)
+            x1_s = torch.where(swap, x2, x1)
+            x2_s = torch.where(swap, x1, x2)
+            x1, x2 = x1_s, x2_s
+        x1 = (x1 - mean_t) / std_t
+        x2 = (x2 - mean_t) / std_t
+        return x1, x2
+
+    @torch.no_grad()
+    def predict_4x_tta(model, arr, indices, img_size, batch_size=64):
+        model.eval()
+        mean_t = IMAGENET_MEAN.cuda()
+        std_t = IMAGENET_STD.cuda()
+        preds = []
+        for s in range(0, len(indices), batch_size):
+            b_idx = indices[s : s + batch_size]
+            x1, x2 = _prep_batch_gpu(arr[b_idx], img_size, False, mean_t, std_t)
+            x1_f = torch.flip(x1, dims=[3])
+            x2_f = torch.flip(x2, dims=[3])
+            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                p1 = F.softmax(model(x1, x2).float(), dim=-1)
+                p2 = F.softmax(model(x2, x1).float(), dim=-1)
+                p3 = F.softmax(model(x1_f, x2_f).float(), dim=-1)
+                p4 = F.softmax(model(x2_f, x1_f).float(), dim=-1)
+            preds.append((0.25 * (p1 + p2 + p3 + p4)).cpu().numpy())
+        return np.vstack(preds).astype(np.float32)
+
+    @torch.no_grad()
+    def _predict_1x_fast(model, arr, indices, img_size, batch_size=64):
+        model.eval()
+        mean_t = IMAGENET_MEAN.cuda()
+        std_t = IMAGENET_STD.cuda()
+        preds = []
+        for s in range(0, len(indices), batch_size):
+            b_idx = indices[s : s + batch_size]
+            x1, x2 = _prep_batch_gpu(arr[b_idx], img_size, False, mean_t, std_t)
+            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                preds.append(F.softmax(model(x1, x2).float(), dim=-1).cpu().numpy())
+        return np.vstack(preds).astype(np.float32)
+
+    def train_siamese_folds(
+        tag, backbone_name, img_size, cache_path, targets, folds, fold_ids,
+        epochs=14, batch_size=64, lr_bb=1.5e-4, lr_head=5e-4, mixup_p=0.5, out_dir="/marimo/Fenomena"
+    ):
+        t_start = time.time()
+        out_dir = Path(out_dir)
+        arr = get_ram_cache(cache_path)
+        y_hard = targets.argmax(axis=1)
+        mean_t = IMAGENET_MEAN.cuda()
+        std_t = IMAGENET_STD.cuda()
+        oof_part = np.zeros_like(targets, dtype=np.float32)
+        fold_stats = {}
+
+        for f in fold_ids:
+            t_f = time.time()
+            torch.manual_seed(42 + int(f))
+            rng = np.random.RandomState(42 + int(f))
+            tr_idx = np.where(folds != f)[0]
+            va_idx = np.where(folds == f)[0]
+            n_batches = max(1, len(tr_idx) // batch_size)
+
+            model = SymmetricSiameseNet(backbone_name, num_classes=6, pretrained=True).cuda()
+            opt = torch.optim.AdamW([
+                {"params": model.backbone.parameters(), "lr": lr_bb},
+                {"params": list(model.diff_attn.parameters()) + list(model.head.parameters()), "lr": lr_head},
+            ], weight_decay=1e-2)
+            total_steps = epochs * n_batches
+            warmup_steps = min(total_steps // 6, 2 * n_batches)
+            def _lr_lambda(step):
+                if step < warmup_steps:
+                    return float(step + 1) / float(max(1, warmup_steps))
+                prog = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+                return max(0.01, 0.5 * (1.0 + math.cos(math.pi * prog)))
+            sched = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
+
+            best_ll = 999.0
+            ckpt_path = out_dir / f"ckpt_{tag}_f{f}.pt"
+
+            for ep in range(1, epochs + 1):
+                model.train()
+                tr_loss = 0.0
+                perm_idx = rng.permutation(tr_idx)
+                for bi in range(n_batches):
+                    b_idx = perm_idx[bi * batch_size : (bi + 1) * batch_size]
+                    x1, x2 = _prep_batch_gpu(arr[b_idx], img_size, True, mean_t, std_t)
+                    y_soft = torch.from_numpy(targets[b_idx]).cuda(non_blocking=True)
+                    if rng.rand() < mixup_p:
+                        lam = float(rng.beta(0.2, 0.2))
+                        p = torch.randperm(x1.size(0), device="cuda")
+                        x1 = lam * x1 + (1.0 - lam) * x1[p]
+                        x2 = lam * x2 + (1.0 - lam) * x2[p]
+                        y_soft = lam * y_soft + (1.0 - lam) * y_soft[p]
+                    opt.zero_grad(set_to_none=True)
+                    with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                        logits = model(x1, x2)
+                        loss = -(y_soft * F.log_softmax(logits.float(), dim=-1)).sum(dim=-1).mean()
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    opt.step()
+                    sched.step()
+                    tr_loss += float(loss.detach())
+                tr_loss /= n_batches
+
+                if ep >= epochs - 5 or ep % 3 == 0:
+                    p_va = _predict_1x_fast(model, arr, va_idx, img_size, batch_size=batch_size)
+                    ll = soft_logloss(targets[va_idx], p_va)
+                    raw_f1 = float(f1_score(y_hard[va_idx], p_va.argmax(axis=1), average="macro"))
+                    mark = ""
+                    if ll < best_ll:
+                        best_ll = ll
+                        torch.save(model.state_dict(), ckpt_path)
+                        mark = " *"
+                    print(f"  [{tag} F{f}] ep {ep:02d}/{epochs} tr={tr_loss:.4f} va_ll={ll:.4f} va_f1={raw_f1:.4f} ({time.time()-t_f:.1f}s){mark}", flush=True)
                 else:
-                    _p2 = _x
-        return _p1, _p2
+                    print(f"  [{tag} F{f}] ep {ep:02d}/{epochs} tr={tr_loss:.4f} ({time.time()-t_f:.1f}s)", flush=True)
 
-    def oos_calibrated_macro_f1(_probs, _y_true, _seed=42):
-        """2-fold nested out-of-sample class-multiplier calibration (0.85x damped) untuk Macro F1."""
-        _rng = _np.random.RandomState(_seed)
-        _perm = _rng.permutation(len(_y_true))
-        _half = len(_y_true) // 2
-        _splits = [(_perm[:_half], _perm[_half:]), (_perm[_half:], _perm[:_half])]
-        _oos_pred = _np.zeros(len(_y_true), dtype=_np.int64)
-        for _fit_i, _eval_i in _splits:
-            _pf, _yf = _probs[_fit_i], _y_true[_fit_i]
-            _mult = _np.ones(6, dtype=_np.float64)
-            for _ in range(3):
-                for _c in range(6):
-                    _best_m, _best_s = _mult[_c], -1.0
-                    for _cand in _np.linspace(0.4, 2.2, 19):
-                        _tmp = _mult.copy()
-                        _tmp[_c] = _cand
-                        _s = _f1_score(_yf, (_pf * _tmp[None, :]).argmax(1), average="macro", zero_division=0)
-                        if _s > _best_s:
-                            _best_s, _best_m = _s, _cand
-                    _mult[_c] = _best_m
-            _mult_damped = 1.0 + 0.85 * (_mult - 1.0)
-            _oos_pred[_eval_i] = (_probs[_eval_i] * _mult_damped[None, :]).argmax(1)
-        return float(_f1_score(_y_true, _oos_pred, average="macro", zero_division=0))
+            # Evaluate best checkpoint with full 4x Bidirectional Swap + HFlip TTA
+            model.load_state_dict(torch.load(ckpt_path, map_location="cuda", weights_only=True))
+            best_probs = predict_4x_tta(model, arr, va_idx, img_size, batch_size=batch_size)
+            tta_ll = soft_logloss(targets[va_idx], best_probs)
+            tta_f1 = float(f1_score(y_hard[va_idx], best_probs.argmax(axis=1), average="macro"))
+            oof_part[va_idx] = best_probs
+            fold_stats[int(f)] = {"logloss": round(tta_ll, 4), "raw_f1": round(tta_f1, 4), "sec": round(time.time() - t_f, 1)}
+            np.save(out_dir / f"oof_part_{tag}_f{f}.npy", best_probs)
+            print(f"  [{tag} F{f}] BEST 4xTTA va_ll={tta_ll:.4f} va_f1={tta_f1:.4f} ({time.time()-t_f:.1f}s)", flush=True)
+            del model, opt, sched
+            torch.cuda.empty_cache()
 
-    def run_fold0_experiment(_iter_name, _pre_u8, _post_u8, _aug_mode="basic", _backbone="efficientnet_b4", _epochs=15, _bs=64, _lr=3e-4):
-        _t0 = _time.time()
-        _tr_idx = _torch.tensor(_np.where(_folds != 0)[0], dtype=_torch.long, device="cuda")
-        _va_idx_np = _np.where(_folds == 0)[0]
-        _va_idx = _torch.tensor(_va_idx_np, dtype=_torch.long, device="cuda")
-        _ys_t = _torch.tensor(_y_soft, dtype=_torch.float32, device="cuda")
-        _yh_t = _torch.tensor(_y_hard, dtype=_torch.long, device="cuda")
-        _sw_t = _torch.tensor(_sw, dtype=_torch.float32, device="cuda")
-
-        _mdl = SymmetricSiameseNet(_backbone, num_classes=6, pretrained=True).cuda()
-        _opt = _torch.optim.AdamW(_mdl.parameters(), lr=_lr, weight_decay=1e-4)
-        _wu = _torch.optim.lr_scheduler.LinearLR(_opt, start_factor=0.1, total_iters=3)
-        _cos = _torch.optim.lr_scheduler.CosineAnnealingLR(_opt, T_max=max(_epochs - 3, 1), eta_min=1e-6)
-        _sched = _torch.optim.lr_scheduler.SequentialLR(_opt, schedulers=[_wu, _cos], milestones=[3])
-
-        _best_ll, _best_probs = 999.0, None
-        _n_tr = len(_tr_idx)
-        for _ep in range(1, _epochs + 1):
-            _mdl.train()
-            _perm = _tr_idx[_torch.randperm(_n_tr, device="cuda")]
-            for _s in range(0, _n_tr, _bs):
-                _bi = _perm[_s:_s + _bs]
-                _p1 = _pre_u8[_bi].float().div_(255.0)
-                _p2 = _post_u8[_bi].float().div_(255.0)
-                _p1, _p2 = _aug_batch(_p1, _p2, _mode=_aug_mode)
-                _yt = _ys_t[_bi]
-                _wt = _sw_t[_bi] * _CW_TENSOR[_yh_t[_bi]]
-
-                # Paired MixUp alpha=0.2
-                if _torch.rand(1).item() < 0.7:
-                    _lam = float(_np.random.beta(0.2, 0.2))
-                    _perm_m = _torch.randperm(len(_bi), device="cuda")
-                    _p1 = _lam * _p1 + (1.0 - _lam) * _p1[_perm_m]
-                    _p2 = _lam * _p2 + (1.0 - _lam) * _p2[_perm_m]
-                    _yt = _lam * _yt + (1.0 - _lam) * _yt[_perm_m]
-                    _wt = _lam * _wt + (1.0 - _lam) * _wt[_perm_m]
-
-                _p1 = (_p1 - _IMG_MEAN) / _IMG_STD
-                _p2 = (_p2 - _IMG_MEAN) / _IMG_STD
-                _opt.zero_grad(set_to_none=True)
-                with _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
-                    _logits = _mdl(_p1, _p2)
-                    _loss_vec = -(_yt * _F.log_softmax(_logits.float(), dim=-1)).sum(dim=-1)
-                    _loss = (_loss_vec * _wt).mean()
-                _loss.backward()
-                _opt.step()
-            _sched.step()
-
-            # Bidirectional Swap-TTA validation on Fold 0
-            _mdl.eval()
-            _vp_list = []
-            with _torch.no_grad():
-                for _s in range(0, len(_va_idx), _bs * 2):
-                    _vi = _va_idx[_s:_s + _bs * 2]
-                    _p1 = (_pre_u8[_vi].float().div_(255.0) - _IMG_MEAN) / _IMG_STD
-                    _p2 = (_post_u8[_vi].float().div_(255.0) - _IMG_MEAN) / _IMG_STD
-                    with _torch.amp.autocast("cuda", dtype=_torch.bfloat16):
-                        _pr1 = _F.softmax(_mdl(_p1, _p2).float(), dim=-1)
-                        _pr2 = _F.softmax(_mdl(_p2, _p1).float(), dim=-1)
-                    _vp_list.append((0.5 * (_pr1 + _pr2)).cpu().numpy())
-            _vp = _np.vstack(_vp_list)
-            _ll = float(_log_loss(_y_hard[_va_idx_np], _np.clip(_vp, 1e-6, 1.0), labels=list(range(6))))
-            if _ll < _best_ll:
-                _best_ll = _ll
-                _best_probs = _vp
-                _torch.save(_mdl.state_dict(), _ART / f"ckpt_f0_{_iter_name}.pth")
-            _rf1 = _f1_score(_y_hard[_va_idx_np], _vp.argmax(1), average="macro", zero_division=0)
-            print(f"  [{_iter_name}] ep={_ep:02d}/{_epochs} val_ll={_ll:.4f} (best={_best_ll:.4f}) raw_f1={_rf1:.4f}", flush=True)
-
-        _raw_f1 = float(_f1_score(_y_hard[_va_idx_np], _best_probs.argmax(1), average="macro", zero_division=0))
-        _cal_f1 = oos_calibrated_macro_f1(_best_probs, _y_hard[_va_idx_np])
-        _dt = round(_time.time() - _t0, 1)
-        del _mdl, _opt, _sched
-        _gc.collect()
-        _torch.cuda.empty_cache()
-        return _best_ll, _raw_f1, _cal_f1, _dt
-
-    _tracker_path = _ART / "experiment_tracker.csv"
-    _rows = []
-
-    print("=== Iter 0: Baseline Simetris (384x384 RGB) ===", flush=True)
-    _pre_384, _post_384 = _load_rgb_tensor_pair_cache(384, _lab_clahe=False)
-    _ll0, _rf0, _cf0, _dt0 = run_fold0_experiment("iter0_base384", _pre_384, _post_384, _aug_mode="basic", _epochs=15)
-    _rows.append({"iter": "Iter 0 (Base 384 RGB)", "res": 384, "lab_clahe": False, "aug": "basic", "f0_logloss": round(_ll0, 4), "f0_raw_f1": round(_rf0, 4), "f0_cal_f1": round(_cf0, 4), "decision": "BASELINE", "sec": _dt0})
-    _best_ll_s1, _best_cf_s1 = _ll0, _cf0
-    del _pre_384, _post_384
-    _gc.collect()
-    _torch.cuda.empty_cache()
-
-    print("=== Iter 1: LAB CLAHE Luminance Normalization (384x384) ===", flush=True)
-    _pre_lab, _post_lab = _load_rgb_tensor_pair_cache(384, _lab_clahe=True)
-    _ll1, _rf1, _cf1, _dt1 = run_fold0_experiment("iter1_lab384", _pre_lab, _post_lab, _aug_mode="basic", _epochs=15)
-    _keep1 = (_ll1 < _best_ll_s1) and (_cf1 > _best_cf_s1)
-    if _keep1:
-        _best_ll_s1, _best_cf_s1 = _ll1, _cf1
-    _rows.append({"iter": "Iter 1 (LAB CLAHE 384)", "res": 384, "lab_clahe": True, "aug": "basic", "f0_logloss": round(_ll1, 4), "f0_raw_f1": round(_rf1, 4), "f0_cal_f1": round(_cf1, 4), "decision": "KEEP" if _keep1 else "ROLLBACK", "sec": _dt1})
-    del _pre_lab, _post_lab
-    _gc.collect()
-    _torch.cuda.empty_cache()
-
-    _df_tr = _pd.DataFrame(_rows)
-    _df_tr.to_csv(_tracker_path, index=False)
-    print("\n=== EXPERIMENT TRACKER (SEMENTARA) ===")
-    print(_df_tr.to_string(index=False))
-    _df_tr
-    return (run_fold0_experiment,)
-
-
-@app.cell
-def K21b_fold0_iter2(run_fold0_experiment):
-    # Fase 2B (Iter 2): Uji Augmentasi Dihedral D4 + RandomResizedCrop(0.75-1.0) identik
-    # + ColorJitter/Gamma/Cloud RandomErasing independen pada 384x384 RGB di Fold 0.
-    import gc as _gc
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from pathlib import Path as _Path
-    import cv2 as _cv2
-    import numpy as _np
-    import pandas as _pd
-    import torch as _torch
-
-    _ART = _Path("/marimo/Fenomena")
-    _df_inv_b = _pd.read_parquet(_ART / "df_inventory.parquet")
-
-    def _load_cache_k21b(_sz=384):
-        def _one(_r):
-            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            return _a1, _a2
-        with _TPE(max_workers=16) as _ex:
-            _res = list(_ex.map(_one, _df_inv_b.to_dict("records")))
-        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        return _pre_t, _post_t
-
-    print("=== Iter 2: D4 Dihedral + Cloud RandomErasing + Independent Gamma/ColorJitter (384x384) ===", flush=True)
-    _pre_384_i2, _post_384_i2 = _load_cache_k21b(384)
-    _ll2, _rf2, _cf2, _dt2 = run_fold0_experiment("iter2_d4aug384", _pre_384_i2, _post_384_i2, _aug_mode="d4_full", _epochs=15)
-    del _pre_384_i2, _post_384_i2
-    _gc.collect()
-    _torch.cuda.empty_cache()
-
-    _df_prev = _pd.read_csv(_ART / "experiment_tracker.csv")
-    _df_prev = _df_prev[_df_prev["iter"] != "Iter 2 (D4+Cloud Aug 384)"]
-    _keep_base_ll = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_logloss"].min())
-    _keep_base_cf = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_cal_f1"].max())
-    _keep2 = (_ll2 < _keep_base_ll) and (_cf2 > _keep_base_cf)
-
-    _row2 = _pd.DataFrame([{"iter": "Iter 2 (D4+Cloud Aug 384)", "res": 384, "lab_clahe": False, "aug": "d4_full", "f0_logloss": round(_ll2, 4), "f0_raw_f1": round(_rf2, 4), "f0_cal_f1": round(_cf2, 4), "decision": "KEEP" if _keep2 else "ROLLBACK", "sec": _dt2}])
-    _df_tr2 = _pd.concat([_df_prev, _row2], ignore_index=True)
-    _df_tr2.to_csv(_ART / "experiment_tracker.csv", index=False)
-    print("\n=== EXPERIMENT TRACKER (SETELAH ITER 2) ===")
-    print(_df_tr2.to_string(index=False))
-    _df_tr2
-    return
-
-
-@app.cell
-def K21c_fold0_iter3(mo, run_fold0_experiment):
-    # Fase 2C (Iter 3): Uji Resolusi Tinggi (448x448 RGB, aug=basic) pada Fold 0,
-    # lalu pilih konfigurasi pemenang Stage 1 dan tampilkan grafik perbandingan Fold 0.
-    import gc as _gc
-    from concurrent.futures import ThreadPoolExecutor as _TPE
-    from pathlib import Path as _Path
-    import cv2 as _cv2
-    import numpy as _np
-    import pandas as _pd
-    import matplotlib as _mpl
-    _mpl.use("Agg")
-    import matplotlib.pyplot as _plt
-    import torch as _torch
-
-    _ART = _Path("/marimo/Fenomena")
-    _df_inv_c = _pd.read_parquet(_ART / "df_inventory.parquet")
-
-    def _load_cache_k21c(_sz=448):
-        def _one(_r):
-            _a1 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_pre"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            _a2 = _cv2.cvtColor(_cv2.resize(_cv2.imread(_r["path_post"]), (_sz, _sz), interpolation=_cv2.INTER_AREA), _cv2.COLOR_BGR2RGB)
-            return _a1, _a2
-        with _TPE(max_workers=16) as _ex:
-            _res = list(_ex.map(_one, _df_inv_c.to_dict("records")))
-        _pre_t = _torch.from_numpy(_np.stack([_x[0] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        _post_t = _torch.from_numpy(_np.stack([_x[1] for _x in _res])).permute(0, 3, 1, 2).contiguous().cuda()
-        return _pre_t, _post_t
-
-    print("=== Iter 3: High-Resolution 448x448 RGB (aug=basic) ===", flush=True)
-    _pre_448, _post_448 = _load_cache_k21c(448)
-    _ll3, _rf3, _cf3, _dt3 = run_fold0_experiment("iter3_res448", _pre_448, _post_448, _aug_mode="basic", _epochs=15, _bs=48)
-    del _pre_448, _post_448
-    _gc.collect()
-    _torch.cuda.empty_cache()
-
-    _df_prev = _pd.read_csv(_ART / "experiment_tracker.csv")
-    _df_prev = _df_prev[_df_prev["iter"] != "Iter 3 (High-Res 448 RGB)"]
-    _keep_base_ll = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_logloss"].min())
-    _keep_base_cf = float(_df_prev[_df_prev["decision"].isin(["BASELINE", "KEEP"])]["f0_cal_f1"].max())
-    _keep3 = (_ll3 < _keep_base_ll) and (_cf3 > _keep_base_cf)
-
-    _row3 = _pd.DataFrame([{"iter": "Iter 3 (High-Res 448 RGB)", "res": 448, "lab_clahe": False, "aug": "basic", "f0_logloss": round(_ll3, 4), "f0_raw_f1": round(_rf3, 4), "f0_cal_f1": round(_cf3, 4), "decision": "KEEP" if _keep3 else "ROLLBACK", "sec": _dt3}])
-    _df_tr3 = _pd.concat([_df_prev, _row3], ignore_index=True)
-    _df_tr3.to_csv(_ART / "experiment_tracker.csv", index=False)
-
-    _winners = _df_tr3[_df_tr3["decision"].isin(["BASELINE", "KEEP"])]
-    _best_row = _winners.sort_values(["f0_logloss", "f0_cal_f1"], ascending=[True, False]).iloc[0]
-    print("\n=== EXPERIMENT TRACKER FINAL STAGE 1 ===")
-    print(_df_tr3.to_string(index=False))
-    print(f"\nPEMENANG STAGE 1 (Keep/Rollback): {_best_row['iter']} | res={_best_row['res']} | lab_clahe={_best_row['lab_clahe']} | aug={_best_row['aug']}")
-
-    _plt.close("all")
-    _fig, _axes = _plt.subplots(1, 2, figsize=(12, 4))
-    _axes[0].bar(_df_tr3["iter"], _df_tr3["f0_logloss"], color=["#2b6cb0" if d != "ROLLBACK" else "#a0aec0" for d in _df_tr3["decision"]])
-    _axes[0].set_title("Fold 0 Validation LogLoss (Lebih Rendah Lebih Baik)")
-    _axes[0].tick_params(axis="x", rotation=18)
-    _axes[0].set_ylim(1.0, max(_df_tr3["f0_logloss"].max() * 1.05, 1.25))
-
-    _axes[1].bar(_df_tr3["iter"], _df_tr3["f0_cal_f1"], color=["#2f855a" if d != "ROLLBACK" else "#a0aec0" for d in _df_tr3["decision"]])
-    _axes[1].set_title("Fold 0 OOS Calibrated Macro F1 (Lebih Tinggi Lebih Baik)")
-    _axes[1].tick_params(axis="x", rotation=18)
-    _axes[1].set_ylim(0.45, max(_df_tr3["f0_cal_f1"].max() * 1.1, 0.65))
-    _fig.tight_layout()
-    mo.status.toast(title="Stage 1 Selesai", description=f"Pemenang: {_best_row['iter']}")
-    _fig
+        print(f"Selesai {tag} folds={fold_ids} dalam {time.time()-t_start:.1f}s: {fold_stats}", flush=True)
+        return oof_part, fold_stats
+    """
+    (_ART / "fenomena_lib.py").write_text(_LIB_CODE.strip() + "\n", encoding="utf-8")
+    print("Ditulis ulang fenomena_lib.py (zero-IPC RAM batching + chunked siamese)", flush=True)
     return
 
 

@@ -1,26 +1,418 @@
 {
-  "EXP_SUMMARY.md": 2279,
-  "_meta.json": 1176,
-  "_vlm_partial.jsonl": 699001,
-  "ckpt_effb4_fold0.pth": 138474697,
-  "ckpt_effb4_fold1.pth": 138474697,
-  "ckpt_effb4_fold2.pth": 138474697,
-  "color_stats.parquet": 79303,
-  "df_change.parquet": 194168,
-  "df_inventory.parquet": 402389,
-  "df_registration.parquet": 11689,
-  "diff_thumb_1_000c166d1af6.png": 48238,
-  "diff_thumb_2_0047c432f3c2.png": 50073,
-  "diff_thumb_3_006b070b2644.png": 44897,
-  "emb_RemoteCLIP_diff.npy": 9769088,
-  "emb_RemoteCLIP_diff_hflip.npy": 9769088,
-  "emb_RemoteCLIP_post.npy": 9769088,
-  "emb_RemoteCLIP_pre.npy": 9769088,
-  "emb_SkyCLIP_diff.npy": 9769088,
-  "emb_SkyCLIP_post.npy": 9769088,
-  "emb_SkyCLIP_pre.npy": 9769088,
-  "model_hunting.md": 1297,
-  "pseudo_labels.parquet": 99530,
-  "sample_grid.png": 3442758,
-  "training_log.md": 50
+  "updated_at": "2026-11-27T14:32:50.081614+00:00",
+  "notes": "Lightweight resumable sync from Molab (/marimo/Fenomena). Excludes *.pt/*.pth weights and 52-78 MB emb_*_5crop_sym.npy feature matrices (kept on Molab).",
+  "notebooks": [
+    {
+      "path": "notebooks/fenomena_eda_modeling.ipynb",
+      "size_bytes": 377880
+    },
+    {
+      "path": "notebooks/molab_notebook.py",
+      "size_bytes": 332106
+    }
+  ],
+  "artifacts_synced_count": 80,
+  "artifacts_synced_total_bytes": 153471103,
+  "artifacts_synced": [
+    {
+      "path": "artifacts_synced/EXP_SUMMARY.md",
+      "size_bytes": 3795,
+      "sha256_prefix": "efa7a12db330d58c"
+    },
+    {
+      "path": "artifacts_synced/FORENSIC_AUDIT_REPORT.md",
+      "size_bytes": 6682,
+      "sha256_prefix": "a0737fe451cccc77"
+    },
+    {
+      "path": "artifacts_synced/_meta.json",
+      "size_bytes": 1176,
+      "sha256_prefix": "fecc2a1c06d05695"
+    },
+    {
+      "path": "artifacts_synced/_vlm_frontier78b_sym_partial.jsonl",
+      "size_bytes": 460230,
+      "sha256_prefix": "8c096ff2260fa0ea"
+    },
+    {
+      "path": "artifacts_synced/_vlm_nonqwen_partial.jsonl",
+      "size_bytes": 736551,
+      "sha256_prefix": "ea94b4166570de32"
+    },
+    {
+      "path": "artifacts_synced/audit_6classes_grid.png",
+      "size_bytes": 10604344,
+      "sha256_prefix": "8a245c845942bbcb"
+    },
+    {
+      "path": "artifacts_synced/audit_6classes_grid_v3.png",
+      "size_bytes": 10432743,
+      "sha256_prefix": "5b30658100bdd006"
+    },
+    {
+      "path": "artifacts_synced/audit_6classes_grid_v4_sym.png",
+      "size_bytes": 10706587,
+      "sha256_prefix": "f8bb1c02527a0f41"
+    },
+    {
+      "path": "artifacts_synced/clip_teacher_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "99e58010e373a266"
+    },
+    {
+      "path": "artifacts_synced/clip_teacher_sym_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "a1dd00d569ac36db"
+    },
+    {
+      "path": "artifacts_synced/color_stats.parquet",
+      "size_bytes": 79303,
+      "sha256_prefix": "14b8635b73995ab8"
+    },
+    {
+      "path": "artifacts_synced/color_stats_all3180.parquet",
+      "size_bytes": 230808,
+      "sha256_prefix": "b168bc9e1cdf6f29"
+    },
+    {
+      "path": "artifacts_synced/consensus_soft_v1.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "5f31aa9b7c880760"
+    },
+    {
+      "path": "artifacts_synced/consensus_soft_v2.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "82c53a93b8583d51"
+    },
+    {
+      "path": "artifacts_synced/df_change.parquet",
+      "size_bytes": 194168,
+      "sha256_prefix": "58b10e67d8d814fa"
+    },
+    {
+      "path": "artifacts_synced/df_inventory.parquet",
+      "size_bytes": 402389,
+      "sha256_prefix": "ac1a8dc859d14a51"
+    },
+    {
+      "path": "artifacts_synced/df_registration.parquet",
+      "size_bytes": 11689,
+      "sha256_prefix": "d9a04fcd2eddb55e"
+    },
+    {
+      "path": "artifacts_synced/diff_thumb_1_000c166d1af6.png",
+      "size_bytes": 48238,
+      "sha256_prefix": "983f1b5409c777ce"
+    },
+    {
+      "path": "artifacts_synced/diff_thumb_2_0047c432f3c2.png",
+      "size_bytes": 50073,
+      "sha256_prefix": "07e3193906953f96"
+    },
+    {
+      "path": "artifacts_synced/diff_thumb_3_006b070b2644.png",
+      "size_bytes": 44897,
+      "sha256_prefix": "e16e685f828b233a"
+    },
+    {
+      "path": "artifacts_synced/emb_RemoteCLIP_diff.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "be94833a4529aefc"
+    },
+    {
+      "path": "artifacts_synced/emb_RemoteCLIP_diff_hflip.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "751f42fcfde085d3"
+    },
+    {
+      "path": "artifacts_synced/emb_RemoteCLIP_post.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "4dda385f8eb7f7b9"
+    },
+    {
+      "path": "artifacts_synced/emb_RemoteCLIP_pre.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "bfab7b415104a37d"
+    },
+    {
+      "path": "artifacts_synced/emb_RemoteCLIP_sym.npy",
+      "size_bytes": 19538048,
+      "sha256_prefix": "c28bcb0d87511354"
+    },
+    {
+      "path": "artifacts_synced/emb_SkyCLIP_diff.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "511c87c7a32f21e3"
+    },
+    {
+      "path": "artifacts_synced/emb_SkyCLIP_post.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "b760139a388d298a"
+    },
+    {
+      "path": "artifacts_synced/emb_SkyCLIP_pre.npy",
+      "size_bytes": 9769088,
+      "sha256_prefix": "4ffb7e9e88a70111"
+    },
+    {
+      "path": "artifacts_synced/emb_SkyCLIP_sym.npy",
+      "size_bytes": 19538048,
+      "sha256_prefix": "33f2eed373f30493"
+    },
+    {
+      "path": "artifacts_synced/experiment_tracker.csv",
+      "size_bytes": 402,
+      "sha256_prefix": "133e44da953b59c4"
+    },
+    {
+      "path": "artifacts_synced/fenomena_lib.py",
+      "size_bytes": 10654,
+      "sha256_prefix": "abdf394aaabeb95b"
+    },
+    {
+      "path": "artifacts_synced/folds_skf5.npy",
+      "size_bytes": 25568,
+      "sha256_prefix": "6d6f8f68d8cdabbb"
+    },
+    {
+      "path": "artifacts_synced/forensic_audit.log",
+      "size_bytes": 7424,
+      "sha256_prefix": "4c06f160c264fe62"
+    },
+    {
+      "path": "artifacts_synced/forensic_inverted_top12.png",
+      "size_bytes": 4875521,
+      "sha256_prefix": "6cc85dc1e3aa664a"
+    },
+    {
+      "path": "artifacts_synced/forensic_math_audit.parquet",
+      "size_bytes": 988564,
+      "sha256_prefix": "3765724ac569d5ff"
+    },
+    {
+      "path": "artifacts_synced/frontier_sym_vlm_clean.log",
+      "size_bytes": 47787,
+      "sha256_prefix": "96e7252fc19db0af"
+    },
+    {
+      "path": "artifacts_synced/georsclip_teacher_sym_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "8acae74e3d231825"
+    },
+    {
+      "path": "artifacts_synced/model_hunting.md",
+      "size_bytes": 1297,
+      "sha256_prefix": "f0fff387815515f3"
+    },
+    {
+      "path": "artifacts_synced/multivlm_rs.log",
+      "size_bytes": 5700,
+      "sha256_prefix": "5c179591df0a5eff"
+    },
+    {
+      "path": "artifacts_synced/oof_part_f0_verify_cnxb512_f0.npy",
+      "size_bytes": 15392,
+      "sha256_prefix": "da77ec0c1a29a87b"
+    },
+    {
+      "path": "artifacts_synced/oof_part_v2_cnxb512_f0.npy",
+      "size_bytes": 15392,
+      "sha256_prefix": "da77ec0c1a29a87b"
+    },
+    {
+      "path": "artifacts_synced/oof_part_v2_cnxb512_f1.npy",
+      "size_bytes": 15392,
+      "sha256_prefix": "4a1b06313011dccb"
+    },
+    {
+      "path": "artifacts_synced/oof_part_v2_cnxb512_f2.npy",
+      "size_bytes": 15392,
+      "sha256_prefix": "9dae8143ba7e6dd6"
+    },
+    {
+      "path": "artifacts_synced/oof_part_v2_cnxb512_f3.npy",
+      "size_bytes": 15392,
+      "sha256_prefix": "690d654360b45cbf"
+    },
+    {
+      "path": "artifacts_synced/oof_v2_cat.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "df50ba55aba42e9c"
+    },
+    {
+      "path": "artifacts_synced/oof_v2_gbdt.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "d11af50a320cb7cb"
+    },
+    {
+      "path": "artifacts_synced/oof_v2_lgb.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "e1ab96307ccdde34"
+    },
+    {
+      "path": "artifacts_synced/oof_v2_mlp_plr.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "9296263bd0bbf664"
+    },
+    {
+      "path": "artifacts_synced/oof_v2_xgb.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "07582ecd350a7a73"
+    },
+    {
+      "path": "artifacts_synced/probs_v3_multivlm_unbiased.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "4dcfaff1ba128db6"
+    },
+    {
+      "path": "artifacts_synced/probs_v4_frontier_sym.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "65daebddb957ffdc"
+    },
+    {
+      "path": "artifacts_synced/pseudo_labels.parquet",
+      "size_bytes": 99530,
+      "sha256_prefix": "d626fffbf86682b4"
+    },
+    {
+      "path": "artifacts_synced/pseudo_labels_v2.parquet",
+      "size_bytes": 108667,
+      "sha256_prefix": "daf11e698fc14a63"
+    },
+    {
+      "path": "artifacts_synced/pseudo_labels_v3.parquet",
+      "size_bytes": 177219,
+      "sha256_prefix": "95177ac625575a99"
+    },
+    {
+      "path": "artifacts_synced/run_clip_teacher.py",
+      "size_bytes": 6037,
+      "sha256_prefix": "37b1ef5f0294e3b1"
+    },
+    {
+      "path": "artifacts_synced/run_forensic_audit.py",
+      "size_bytes": 18466,
+      "sha256_prefix": "e3a536bf67e28815"
+    },
+    {
+      "path": "artifacts_synced/run_frontier_sym_vlm.py",
+      "size_bytes": 19993,
+      "sha256_prefix": "4646ff902aa009f2"
+    },
+    {
+      "path": "artifacts_synced/run_multivlm_rs.py",
+      "size_bytes": 21194,
+      "sha256_prefix": "2cc2f2ada8eeb05a"
+    },
+    {
+      "path": "artifacts_synced/run_vlm32b.log",
+      "size_bytes": 2705,
+      "sha256_prefix": "7856336c3ec85aa2"
+    },
+    {
+      "path": "artifacts_synced/run_vlm32b_logits.log",
+      "size_bytes": 3555,
+      "sha256_prefix": "cdd8aa9e68c9e6f1"
+    },
+    {
+      "path": "artifacts_synced/run_vlm32b_logits.py",
+      "size_bytes": 8743,
+      "sha256_prefix": "04440ae9aab7b585"
+    },
+    {
+      "path": "artifacts_synced/run_vlm32b_teacher.py",
+      "size_bytes": 9566,
+      "sha256_prefix": "000099dd00eca103"
+    },
+    {
+      "path": "artifacts_synced/sample_grid.png",
+      "size_bytes": 3442758,
+      "sha256_prefix": "388bfb2ad9b4a29b"
+    },
+    {
+      "path": "artifacts_synced/siglip2_teacher_sym_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "3602fdbc08ace788"
+    },
+    {
+      "path": "artifacts_synced/siglip2giant_raw_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "b00ffd5e74e3653c"
+    },
+    {
+      "path": "artifacts_synced/submission_anchor_vlm32b.csv",
+      "size_bytes": 69313,
+      "sha256_prefix": "25223d9c93be1ff6"
+    },
+    {
+      "path": "artifacts_synced/submission_early_hybrid.csv",
+      "size_bytes": 68951,
+      "sha256_prefix": "a4df375f3aa88e7c"
+    },
+    {
+      "path": "artifacts_synced/submission_v2_unbiased.csv",
+      "size_bytes": 68640,
+      "sha256_prefix": "b3067f2b90fe07eb"
+    },
+    {
+      "path": "artifacts_synced/submission_v3_multivlm.csv",
+      "size_bytes": 68604,
+      "sha256_prefix": "3f263cdec2594c2c"
+    },
+    {
+      "path": "artifacts_synced/submission_v4_frontier_sym.csv",
+      "size_bytes": 68522,
+      "sha256_prefix": "479e2d8bee5e7979"
+    },
+    {
+      "path": "artifacts_synced/training_log.md",
+      "size_bytes": 50,
+      "sha256_prefix": "c54f9279480ce435"
+    },
+    {
+      "path": "artifacts_synced/vlm2_internvl_cal_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "feda65af849cb2e2"
+    },
+    {
+      "path": "artifacts_synced/vlm2_internvl_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "4ea397c7f8cecf4a"
+    },
+    {
+      "path": "artifacts_synced/vlm32b_raw_logits_flip.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "4c03728c8b506819"
+    },
+    {
+      "path": "artifacts_synced/vlm32b_raw_logits_orig.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "dc4c057b373a8c10"
+    },
+    {
+      "path": "artifacts_synced/vlm32b_repass556_logits.npy",
+      "size_bytes": 13472,
+      "sha256_prefix": "1a2910af46c064ce"
+    },
+    {
+      "path": "artifacts_synced/vlm32b_teacher_probs.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "b76fe4a81fdd8aee"
+    },
+    {
+      "path": "artifacts_synced/vlm_frontier78b_sym_logits.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "c0dbc3b07e0d2de2"
+    },
+    {
+      "path": "artifacts_synced/vlm_internvl38b_raw_logits.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "81a0a8baec222163"
+    },
+    {
+      "path": "artifacts_synced/vlm_mistral24b_raw_logits.npy",
+      "size_bytes": 76448,
+      "sha256_prefix": "9407de64dad3931a"
+    }
+  ]
 }
