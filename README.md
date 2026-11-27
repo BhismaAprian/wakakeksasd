@@ -1,4 +1,4 @@
-# Klasifikasi Fenomena Bencana (Datavidia — Task 2 Pre/Post Disaster Pairs)
+# Klasifikasi Fenomena Bencana (— Task 2 Pre/Post Disaster Pairs)
 
 Pipeline *end-to-end* untuk klasifikasi **3.180 pasangan citra udara/satelit** (`pre.jpg` dan `post.jpg`, `1024x1024` RGB) ke dalam 6 kelas bencana (**Earthquake, Fire, Hurricane, Tsunami, Volcano, Explosion**) dengan metrik evaluasi **Macro F1-Score**.
 
